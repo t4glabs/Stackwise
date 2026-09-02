@@ -8,101 +8,90 @@ export type SyncResult = {
   ranAt: string;
   configured: boolean;
   booksScanned: number;
-  coursesPublished: number;
-  coursesUnpublished: number;
+  newlyDiscovered: number;
 };
 
-// Pulls every BookStack book, reads its lms_* tags, and upserts a Course (+ Program +
-// Lessons) for anything tagged lms_publish=true. Page/lesson *content* is never stored
-// here — only enough metadata to render a catalog and track progress. Safe to call
-// repeatedly: this is what both the webhook receiver and the scheduled poll invoke.
+// Pulls every BookStack book and makes sure a Course row exists for each one — newly
+// discovered books are hidden from the catalog by default (published: false) so an
+// admin can review them in /admin/courses before anything goes live. Only *content*
+// fields (title, description, cover, lessons) are refreshed on repeat syncs; LMS
+// configuration (published, type, program, duration, facilitators) is owned by our own
+// DB from the moment a course is first discovered — see the architecture note in
+// src/lib/tags.ts. Page/lesson bodies are never stored here, only fetched live.
 export async function syncCourses(org: Organization): Promise<SyncResult> {
   if (!bookstackIsConfigured()) {
-    return {
-      ranAt: new Date().toISOString(),
-      configured: false,
-      booksScanned: 0,
-      coursesPublished: 0,
-      coursesUnpublished: 0,
-    };
+    return { ranAt: new Date().toISOString(), configured: false, booksScanned: 0, newlyDiscovered: 0 };
   }
 
   const summaries = await listAllBooks();
-  let published = 0;
-  let unpublished = 0;
-  const seenBookIds = new Set<number>();
+  let newlyDiscovered = 0;
 
   for (const summary of summaries) {
     const book = await getBook(summary.id);
-    const meta = parseCourseTags(book.tags);
-    seenBookIds.add(book.id);
-
-    if (!meta.publish) {
-      const existing = await prisma.course.findUnique({
-        where: { organizationId_bookstackBookId: { organizationId: org.id, bookstackBookId: book.id } },
-      });
-      if (existing?.published) {
-        await prisma.course.update({ where: { id: existing.id }, data: { published: false } });
-        unpublished += 1;
-      }
-      continue;
-    }
-
-    let programId: string | null = null;
-    if (meta.program) {
-      const program = await prisma.program.upsert({
-        where: { organizationId_slug: { organizationId: org.id, slug: slugify(meta.program) } },
-        create: { organizationId: org.id, name: meta.program, slug: slugify(meta.program) },
-        update: { name: meta.program },
-      });
-      programId = program.id;
-    }
-
-    const course = await prisma.course.upsert({
-      where: {
-        organizationId_bookstackBookId: { organizationId: org.id, bookstackBookId: book.id },
-      },
-      create: {
-        organizationId: org.id,
-        bookstackBookId: book.id,
-        slug: book.slug,
-        title: book.name,
-        description: book.description || null,
-        coverImageUrl: book.cover?.url ?? null,
-        programId,
-        type: meta.type,
-        externalUrl: meta.externalUrl,
-        facilitatorEmail: meta.facilitatorEmail,
-        durationLabel: meta.durationLabel,
-        order: meta.order,
-        published: true,
-        lastSyncedAt: new Date(),
-      },
-      update: {
-        slug: book.slug,
-        title: book.name,
-        description: book.description || null,
-        coverImageUrl: book.cover?.url ?? null,
-        programId,
-        type: meta.type,
-        externalUrl: meta.externalUrl,
-        facilitatorEmail: meta.facilitatorEmail,
-        durationLabel: meta.durationLabel,
-        order: meta.order,
-        published: true,
-        lastSyncedAt: new Date(),
-      },
+    const existing = await prisma.course.findUnique({
+      where: { organizationId_bookstackBookId: { organizationId: org.id, bookstackBookId: book.id } },
     });
-    published += 1;
+
+    let courseId: string;
+
+    if (!existing) {
+      // First time we've seen this book — use any pre-existing lms_* tags as a
+      // starting point (handy if tags were set before this admin UI existed), then
+      // the admin takes over from here via /admin/courses.
+      const meta = parseCourseTags(book.tags);
+
+      let programId: string | null = null;
+      if (meta.program) {
+        const program = await prisma.program.upsert({
+          where: { organizationId_slug: { organizationId: org.id, slug: slugify(meta.program) } },
+          create: { organizationId: org.id, name: meta.program, slug: slugify(meta.program) },
+          update: {},
+        });
+        programId = program.id;
+      }
+
+      const course = await prisma.course.create({
+        data: {
+          organizationId: org.id,
+          bookstackBookId: book.id,
+          slug: book.slug,
+          title: book.name,
+          description: book.description || null,
+          coverImageUrl: book.cover?.url ?? null,
+          programId,
+          type: meta.type,
+          externalUrl: meta.externalUrl,
+          durationLabel: meta.durationLabel,
+          order: meta.order,
+          published: meta.publish,
+          downloadableWorkbook: meta.downloadable,
+          lastSyncedAt: new Date(),
+        },
+      });
+      courseId = course.id;
+      newlyDiscovered += 1;
+    } else {
+      await prisma.course.update({
+        where: { id: existing.id },
+        data: {
+          title: book.name,
+          description: book.description || null,
+          coverImageUrl: book.cover?.url ?? null,
+          lastSyncedAt: new Date(),
+        },
+      });
+      courseId = existing.id;
+    }
 
     // Flatten chapters into lessons: a page directly on the book, or a page inside a chapter.
+    // The chapter's own name rides along purely to label per-chapter workbook downloads.
     let order = 0;
     for (const item of book.contents) {
       if (item.type === "page") {
-        await upsertLesson(course.id, item.id, null, item.name, item.slug, order++);
+        await upsertLesson(courseId, item.id, null, null, item.name, item.slug, order++);
       } else {
         for (const page of item.pages) {
-          await upsertLesson(course.id, page.id, item.id, page.name, page.slug, order++);
+          await upsertLesson(courseId, page.id, item.id, item.name, page.name, page.slug, order++);
         }
       }
     }
@@ -112,8 +101,7 @@ export async function syncCourses(org: Organization): Promise<SyncResult> {
     ranAt: new Date().toISOString(),
     configured: true,
     booksScanned: summaries.length,
-    coursesPublished: published,
-    coursesUnpublished: unpublished,
+    newlyDiscovered,
   };
 }
 
@@ -121,6 +109,7 @@ async function upsertLesson(
   courseId: string,
   bookstackPageId: number,
   bookstackChapterId: number | null,
+  chapterTitle: string | null,
   title: string,
   slug: string,
   order: number
@@ -131,10 +120,11 @@ async function upsertLesson(
       courseId,
       bookstackPageId,
       bookstackChapterId,
+      chapterTitle,
       title,
       slug,
       order,
     },
-    update: { title, slug, order, bookstackChapterId },
+    update: { title, slug, order, bookstackChapterId, chapterTitle },
   });
 }

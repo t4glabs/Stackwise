@@ -46,3 +46,7 @@ next-env.d.ts
 # local sqlite dev database
 *.db
 *.db-journal
+
+# admin-uploaded logo/favicon — runtime content, not source (see DEPLOY.md if you
+# need to back these up)
+/public/uploads/

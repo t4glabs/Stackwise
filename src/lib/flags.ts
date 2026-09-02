@@ -24,6 +24,16 @@ export const FEATURE_FLAGS = {
     description: "Facilitators can be explicitly assigned to courses.",
     default: true,
   },
+  learner_email_optional: {
+    label: "Learner email optional",
+    description: "Allow adding a learner without an email address (they'll get a username instead).",
+    default: false,
+  },
+  facilitator_email_optional: {
+    label: "Facilitator email optional",
+    description: "Allow adding a facilitator without an email address (they'll get a username instead).",
+    default: false,
+  },
   cohorts: {
     label: "Cohorts",
     description: "Batch/cohort grouping for facilitated programs.",

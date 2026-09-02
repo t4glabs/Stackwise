@@ -4,7 +4,7 @@
 module.exports = {
   apps: [
     {
-      name: "welive-lms",
+      name: "stackwise",
       cwd: __dirname,
       script: "npm",
       args: "start",

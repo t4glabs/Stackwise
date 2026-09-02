@@ -50,24 +50,29 @@ export default async function LessonPage({
   const nextLesson = course.lessons[lessonIndex + 1];
 
   return (
-    <Container className="flex max-w-3xl flex-col gap-8 py-14">
-      <Link href={coursePath} className="flex items-center gap-1 text-sm font-medium text-grey-600 hover:text-ink">
+    <Container className="flex max-w-[720px] flex-col gap-10 py-16">
+      <Link
+        href={coursePath}
+        className="flex w-fit items-center gap-1.5 text-[14px] font-medium text-stone-600 hover:text-ink"
+      >
         <ArrowLeft className="size-4" /> {course.title}
       </Link>
 
-      <div className="flex flex-col gap-2">
-        <span className="font-mono text-xs text-grey-500">
+      <div className="flex flex-col gap-2 border-b border-stone-200 pb-8">
+        <span className="font-mono text-[12px] uppercase tracking-[0.1em] text-grey-400">
           Lesson {lessonIndex + 1} of {course.lessons.length}
         </span>
-        <h1 className="text-2xl font-bold tracking-tight text-ink">{lesson.title}</h1>
+        <h1 className="text-[30px] font-semibold leading-tight tracking-tight text-ink">
+          {lesson.title}
+        </h1>
       </div>
 
       <article
-        className="prose prose-sm max-w-none text-ink prose-headings:font-semibold prose-a:text-accent"
+        className="prose max-w-none font-serif text-[16px] leading-relaxed text-ink prose-headings:font-sans prose-headings:font-semibold prose-headings:tracking-tight prose-a:text-accent prose-strong:text-ink prose-img:rounded-card"
         dangerouslySetInnerHTML={{ __html: html }}
       />
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-grey-200 pt-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-stone-200 pt-8">
         {prevLesson ? (
           <Button variant="outline" asChild>
             <Link href={`/courses/${slug}/lessons/${prevLesson.slug}`}>
@@ -79,12 +84,14 @@ export default async function LessonPage({
         )}
 
         {progress?.completedAt ? (
-          <span className="flex items-center gap-1.5 text-sm font-medium text-success">
+          <span className="flex items-center gap-1.5 text-[14px] font-medium text-success">
             <CheckCircle2 className="size-4" /> Completed
           </span>
         ) : (
           <form action={markLessonComplete.bind(null, lesson.id, coursePath)}>
-            <Button type="submit">Mark complete</Button>
+            <Button variant="accent" type="submit">
+              Mark complete
+            </Button>
           </form>
         )}
 

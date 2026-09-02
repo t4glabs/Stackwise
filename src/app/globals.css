@@ -2,7 +2,7 @@
 @plugin "@tailwindcss/typography";
 
 :root {
-  --color-ink: #202226;
+  --color-ink: #1f2421;
   --color-grey-50: #f9f9fb;
   --color-grey-100: #f4f5f7;
   --color-grey-200: #eff0f3;
@@ -14,8 +14,18 @@
   --color-grey-800: #6b7280;
   --color-grey-900: #3d4451;
 
-  --color-accent: #3167d6;
-  --color-accent-soft: #eaf0fd;
+  /* Warm neutrals — editorial pages sit on cream, not the cool dashboard greys. */
+  --color-stone-200: #ede5df;
+  --color-stone-400: #8e857d;
+  --color-stone-600: #6b635e;
+  --color-cream: #fbf7f4;
+
+  /* Overridden per-deployment from Organization.accentColor (see app/layout.tsx) — the
+     fallback here only matters for local dev before the DB is seeded. accent-soft is
+     derived with color-mix rather than stored, so any accent color gets a matching tint
+     automatically instead of needing two values kept in sync. */
+  --color-accent: #7358b3;
+  --color-accent-soft: color-mix(in srgb, var(--color-accent) 14%, white);
   --color-success: #1f9d4a;
   --color-success-soft: #e8f7ee;
   --color-warning: #a06a00;
@@ -23,7 +33,7 @@
   --color-danger: #c22222;
   --color-danger-soft: #fbe9e9;
 
-  --background: #fdfdfc;
+  --background: var(--color-cream);
   --foreground: var(--color-ink);
 }
 
@@ -41,6 +51,10 @@
   --color-grey-700: var(--color-grey-700);
   --color-grey-800: var(--color-grey-800);
   --color-grey-900: var(--color-grey-900);
+  --color-stone-200: var(--color-stone-200);
+  --color-stone-400: var(--color-stone-400);
+  --color-stone-600: var(--color-stone-600);
+  --color-cream: var(--color-cream);
   --color-accent: var(--color-accent);
   --color-accent-soft: var(--color-accent-soft);
   --color-success: var(--color-success);
@@ -50,7 +64,11 @@
   --color-danger: var(--color-danger);
   --color-danger-soft: var(--color-danger-soft);
 
-  --font-sans: var(--font-inter);
+  /* Figtree carries headings, nav, and every UI surface. Source Serif 4 is reserved
+     for editorial body copy (course descriptions, lesson content) — the pairing is
+     the single biggest thing separating the Aikyam sites from a generic sans-only UI. */
+  --font-sans: var(--font-figtree);
+  --font-serif: var(--font-source-serif);
   --font-mono: var(--font-geist-mono);
 
   --radius-control: 6px;
@@ -65,4 +83,9 @@ body {
 
 * {
   border-color: var(--color-grey-200);
+}
+
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
 }

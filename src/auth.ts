@@ -13,18 +13,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Credentials({
       credentials: {
-        username: { label: "Username", type: "text" },
+        identifier: { label: "Email or username", type: "text" },
         password: { label: "Password", type: "password" },
       },
       authorize: async (credentials) => {
-        const username = credentials?.username;
+        const identifier = credentials?.identifier;
         const password = credentials?.password;
-        if (typeof username !== "string" || typeof password !== "string") {
+        if (typeof identifier !== "string" || typeof password !== "string") {
           return null;
         }
 
-        const user = await prisma.user.findUnique({
-          where: { username: username.trim().toLowerCase() },
+        // Most accounts log in with their email; accounts created without one (see
+        // learner_email_optional / facilitator_email_optional flags) use a username
+        // instead — one field on the login form covers both.
+        const value = identifier.trim().toLowerCase();
+        const user = await prisma.user.findFirst({
+          where: { OR: [{ email: value }, { username: value }] },
         });
         if (!user) return null;
 

@@ -28,7 +28,7 @@ export function RegisterForm() {
 
       {error ? <p className="text-sm text-danger">{error}</p> : null}
 
-      <Button type="submit" disabled={pending} className="mt-2">
+      <Button variant="accent" type="submit" disabled={pending} className="mt-2 w-full">
         {pending ? "Creating account…" : "Create account"}
       </Button>
     </form>

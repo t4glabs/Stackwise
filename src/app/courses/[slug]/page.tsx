@@ -7,9 +7,10 @@ import { getFlags } from "@/lib/flags";
 import { Container } from "@/components/ui/container";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { ProgressBar } from "@/components/progress-bar";
 import { enrollInCourse, markCourseComplete } from "@/lib/actions/enrollment-actions";
-import { CheckCircle2, Circle, ExternalLink } from "lucide-react";
+import { CheckCircle2, Circle, ExternalLink, Download } from "lucide-react";
 
 const TYPE_LABEL: Record<string, string> = {
   SELF_PACED: "Self-paced",
@@ -59,20 +60,26 @@ export default async function CourseDetailPage({
   const percent = course.lessons.length ? (completedCount / course.lessons.length) * 100 : 0;
 
   return (
-    <Container className="flex max-w-3xl flex-col gap-8 py-14">
+    <Container className="flex max-w-[720px] flex-col gap-10 py-16">
       <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="accent">{TYPE_LABEL[course.type]}</Badge>
-          {course.program ? <Badge variant="neutral">{course.program.name}</Badge> : null}
-          {course.durationLabel ? <Badge variant="neutral">{course.durationLabel}</Badge> : null}
-        </div>
-        <h1 className="text-3xl font-bold tracking-tight text-ink text-balance">
+        <Eyebrow>{course.program?.name ?? TYPE_LABEL[course.type]}</Eyebrow>
+        <h1 className="text-balance text-[36px] font-semibold leading-[1.1] tracking-[-0.01em] text-ink sm:text-[40px]">
           {course.title}
         </h1>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge variant="accent">{TYPE_LABEL[course.type]}</Badge>
+          {course.durationLabel ? <Badge pill>{course.durationLabel}</Badge> : null}
+        </div>
         {course.description ? (
-          <p className="text-base text-grey-700">{course.description}</p>
+          <p className="font-serif text-[17px] leading-relaxed text-stone-600">
+            {course.description}
+          </p>
         ) : null}
       </div>
+
+      {course.downloadableWorkbook ? (
+        <WorkbookDownloads slug={slug} lessons={course.lessons} />
+      ) : null}
 
       {course.type === "EXTERNAL_LINK" ? (
         <ExternalCourseAction
@@ -99,6 +106,48 @@ export default async function CourseDetailPage({
   );
 }
 
+function WorkbookDownloads({
+  slug,
+  lessons,
+}: {
+  slug: string;
+  lessons: { bookstackChapterId: number | null; chapterTitle: string | null }[];
+}) {
+  const chapters: { id: number; title: string }[] = [];
+  const seen = new Set<number>();
+  for (const lesson of lessons) {
+    if (lesson.bookstackChapterId != null && !seen.has(lesson.bookstackChapterId)) {
+      seen.add(lesson.bookstackChapterId);
+      chapters.push({ id: lesson.bookstackChapterId, title: lesson.chapterTitle ?? "Untitled chapter" });
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4 rounded-card border border-stone-200 bg-white p-6">
+      <div>
+        <Eyebrow className="mb-1.5">Offline use</Eyebrow>
+        <p className="text-[15px] text-stone-600">
+          Get this as a Word document to fill in and share back — no internet needed.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" asChild>
+          <a href={`/api/courses/${slug}/export`}>
+            <Download className="size-4" /> Whole course (.docx)
+          </a>
+        </Button>
+        {chapters.map((chapter) => (
+          <Button key={chapter.id} variant="outline" size="sm" asChild>
+            <a href={`/api/courses/${slug}/export?chapter=${chapter.id}`}>
+              <Download className="size-4" /> {chapter.title} (.docx)
+            </a>
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ExternalCourseAction({
   courseId,
   externalUrl,
@@ -113,17 +162,17 @@ function ExternalCourseAction({
   completed: boolean;
 }) {
   if (!externalUrl) {
-    return <p className="text-sm text-grey-600">No external link has been set for this course yet.</p>;
+    return <p className="text-[15px] text-stone-600">No external link has been set for this course yet.</p>;
   }
 
   return (
-    <div className="flex flex-col gap-4 rounded-card border border-grey-200 bg-grey-50 p-6">
-      <p className="text-sm text-grey-700">
+    <div className="flex flex-col gap-4 rounded-card border border-stone-200 bg-white p-6">
+      <p className="text-[15px] text-stone-600">
         This course is hosted externally. It opens in a new tab — come back here and mark it
         complete once you&apos;re done.
       </p>
       <div className="flex flex-wrap items-center gap-3">
-        <Button asChild>
+        <Button variant="accent" asChild>
           <a href={externalUrl} target="_blank" rel="noreferrer">
             Open course <ExternalLink className="size-4" />
           </a>
@@ -139,7 +188,7 @@ function ExternalCourseAction({
             </form>
           )
         ) : (
-          <Link href={`/login?callbackUrl=${coursePath}`} className="text-sm font-medium text-accent hover:underline">
+          <Link href={`/login?callbackUrl=${coursePath}`} className="text-[14px] font-medium text-accent hover:underline">
             Log in to track your progress
           </Link>
         )}
@@ -170,9 +219,9 @@ function SelfOrFacilitatedCourse({
   slug: string;
 }) {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       {!loggedIn ? (
-        <div className="rounded-card border border-grey-200 bg-grey-50 p-6 text-sm text-grey-700">
+        <div className="rounded-card border border-stone-200 bg-white p-6 text-[15px] text-stone-600">
           <Link href={`/login?callbackUrl=${coursePath}`} className="font-medium text-accent hover:underline">
             Log in
           </Link>{" "}
@@ -181,36 +230,38 @@ function SelfOrFacilitatedCourse({
       ) : !enrolled ? (
         selfEnrollmentEnabled ? (
           <form action={enrollInCourse.bind(null, courseId, coursePath)}>
-            <Button type="submit" size="lg">
+            <Button variant="accent" type="submit" size="lg">
               Enroll
             </Button>
           </form>
         ) : (
-          <p className="text-sm text-grey-600">
+          <p className="text-[15px] text-stone-600">
             Ask your facilitator to enroll you in this course.
           </p>
         )
       ) : (
-        <ProgressBar percent={percent} />
+        <div className="rounded-card border border-stone-200 bg-white p-5">
+          <ProgressBar percent={percent} />
+        </div>
       )}
 
-      <div className="flex flex-col gap-2">
-        <h2 className="text-sm font-bold uppercase tracking-widest text-grey-600">Syllabus</h2>
-        <ol className="flex flex-col divide-y divide-grey-200 rounded-card border border-grey-200 bg-white">
+      <div className="flex flex-col gap-4">
+        <Eyebrow>Syllabus</Eyebrow>
+        <ol className="flex flex-col divide-y divide-grey-200 overflow-hidden rounded-card border border-grey-200 bg-white">
           {lessons.map((lesson, i) => {
             const done = Boolean(progressByLesson.get(lesson.id)?.completedAt);
             return (
               <li key={lesson.id}>
                 <Link
                   href={enrolled ? `/courses/${slug}/lessons/${lesson.slug}` : coursePath}
-                  className="flex items-center gap-3 px-5 py-3.5 text-sm hover:bg-grey-50"
+                  className="flex items-center gap-4 px-5 py-4 text-[15px] transition-colors hover:bg-grey-50"
                 >
                   {done ? (
-                    <CheckCircle2 className="size-4 shrink-0 text-success" />
+                    <CheckCircle2 className="size-[18px] shrink-0 text-success" />
                   ) : (
-                    <Circle className="size-4 shrink-0 text-grey-400" />
+                    <Circle className="size-[18px] shrink-0 text-grey-300" />
                   )}
-                  <span className="font-mono text-xs text-grey-500">
+                  <span className="font-mono text-[13px] tabular-nums text-grey-400">
                     {String(i + 1).padStart(2, "0")}
                   </span>
                   <span className="text-ink">{lesson.title}</span>

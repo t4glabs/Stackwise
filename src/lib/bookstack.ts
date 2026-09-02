@@ -1,6 +1,9 @@
 // Thin typed client for the BookStack REST API. BookStack stays the source of truth
-// for all content — this file only ever reads. See prisma/schema.prisma and
-// src/lib/tags.ts for how the lms_* tags turn a Book into a Course.
+// for all *content* (text, structure, attachments). LMS *configuration* (published,
+// delivery type, program, duration, facilitators) is owned by our own DB and edited
+// in plain language in /admin/courses — we only write lms_* tags back to BookStack
+// afterwards so a wiki editor can see it, never the other way around. See
+// src/lib/tags.ts for the two-way mapping and src/lib/sync.ts for discovery.
 
 export type BookStackTag = { name: string; value: string };
 
@@ -74,7 +77,10 @@ export function bookstackIsConfigured() {
   return Boolean(tokenId && tokenSecret);
 }
 
-async function bookstackFetch<T>(path: string): Promise<T> {
+async function bookstackFetch<T>(
+  path: string,
+  init?: { method?: string; body?: unknown }
+): Promise<T> {
   const { baseUrl, tokenId, tokenSecret } = getConfig();
   if (!tokenId || !tokenSecret) {
     throw new BookStackConfigError(
@@ -83,10 +89,13 @@ async function bookstackFetch<T>(path: string): Promise<T> {
   }
 
   const res = await fetch(`${baseUrl}/api${path}`, {
+    method: init?.method ?? "GET",
     headers: {
       Authorization: `Token ${tokenId}:${tokenSecret}`,
       Accept: "application/json",
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
     },
+    body: init?.body ? JSON.stringify(init.body) : undefined,
     // Content changes when an editor saves in BookStack; the sync route (webhook +
     // scheduled poll) is what refreshes our index, so we don't need Next's own cache here.
     cache: "no-store",
@@ -125,4 +134,17 @@ export async function getBook(id: number): Promise<BookStackBookDetail> {
 
 export async function getPage(id: number): Promise<BookStackPageDetail> {
   return bookstackFetch<BookStackPageDetail>(`/pages/${id}`);
+}
+
+// Writes the given lms_* tags onto a book, preserving any other (non-lms_) tags that
+// are already there. Best-effort by design — callers should catch failures and still
+// keep the LMS-side save, since our own DB is what actually governs app behavior.
+export async function updateBookTags(id: number, lmsTags: BookStackTag[]): Promise<void> {
+  const current = await getBook(id);
+  const preserved = current.tags.filter((t) => !t.name.toLowerCase().startsWith("lms_"));
+
+  await bookstackFetch(`/books/${id}`, {
+    method: "PUT",
+    body: { tags: [...preserved, ...lmsTags] },
+  });
 }

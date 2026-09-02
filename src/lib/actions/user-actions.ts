@@ -4,66 +4,146 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
+import { generateTempPassword } from "@/lib/temp-password";
+import { generateUniqueUsername } from "@/lib/username";
+import { isFeatureEnabled } from "@/lib/flags";
 import { revalidatePath } from "next/cache";
+import type { Role } from "@/generated/prisma/client";
 
-const schema = z.object({
-  name: z.string().trim().min(1, "Name is required"),
-  username: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .min(3, "Username must be at least 3 characters")
-    .regex(/^[a-z0-9._-]+$/, "Use only letters, numbers, dots, dashes, underscores"),
-});
+const nameSchema = z.string().trim().min(1, "Name is required");
+const emailSchema = z.email("That doesn't look like a valid email address");
+const usernameSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(3, "Username must be at least 3 characters")
+  .regex(/^[a-z0-9._-]+$/, "Use only letters, numbers, dots, dashes, underscores");
 
-function generateTempPassword() {
-  // Short, readable, not security-critical — the learner changes it on first real use.
-  // See DEPLOY.md / open question 3: many CCI youth have no personal email, so
-  // facilitators hand this off directly rather than an emailed reset link.
-  const words = ["river", "cedar", "maple", "coral", "amber", "quartz", "willow", "sable"];
-  const word = words[Math.floor(Math.random() * words.length)];
-  const digits = Math.floor(100 + Math.random() * 900);
-  return `${word}${digits}`;
-}
-
-export type CreateLearnerState =
-  | { ok: true; username: string; password: string }
+export type CreateUserState =
+  | { ok: true; id: string; identifier: string; password: string }
   | { ok: false; error: string }
   | undefined;
 
+// Exported so course-roster-actions.ts can reuse the exact same validation/creation
+// logic for the "create a new learner and enroll them" flow — one registry, one path
+// to get into it, whether or not a course enrollment happens alongside it.
+export async function createUser(
+  role: Role,
+  formData: FormData,
+  emailOptional: boolean
+): Promise<CreateUserState> {
+  const nameResult = nameSchema.safeParse(formData.get("name"));
+  if (!nameResult.success) {
+    return { ok: false, error: nameResult.error.issues[0]?.message ?? "Invalid name." };
+  }
+  const name = nameResult.data;
+
+  const emailRaw = String(formData.get("email") ?? "").trim().toLowerCase();
+  const session = await auth();
+  let email: string | null = null;
+  let username: string;
+
+  if (emailRaw) {
+    const emailResult = emailSchema.safeParse(emailRaw);
+    if (!emailResult.success) {
+      return { ok: false, error: emailResult.error.issues[0]?.message ?? "Invalid email." };
+    }
+    const existingByEmail = await prisma.user.findUnique({ where: { email: emailResult.data } });
+    if (existingByEmail) return { ok: false, error: "That email is already in use." };
+
+    email = emailResult.data;
+    username = await generateUniqueUsername(email);
+  } else {
+    if (!emailOptional) {
+      return { ok: false, error: "Email is required." };
+    }
+    const usernameResult = usernameSchema.safeParse(formData.get("username"));
+    if (!usernameResult.success) {
+      return { ok: false, error: usernameResult.error.issues[0]?.message ?? "Invalid username." };
+    }
+    const existingByUsername = await prisma.user.findUnique({ where: { username: usernameResult.data } });
+    if (existingByUsername) return { ok: false, error: "That username is already taken." };
+    username = usernameResult.data;
+  }
+
+  const tempPassword = generateTempPassword();
+
+  const created = await prisma.user.create({
+    data: {
+      organizationId: session!.user.organizationId,
+      role,
+      username,
+      email,
+      name,
+      passwordHash: await hashPassword(tempPassword),
+      createdById: session!.user.id,
+    },
+  });
+
+  return { ok: true, id: created.id, identifier: email ?? username, password: tempPassword };
+}
+
 export async function createLearnerAction(
-  _prevState: CreateLearnerState,
+  _prevState: CreateUserState,
   formData: FormData
-): Promise<CreateLearnerState> {
+): Promise<CreateUserState> {
   const session = await auth();
   if (!session?.user || (session.user.role !== "FACILITATOR" && session.user.role !== "ADMIN")) {
     return { ok: false, error: "Only facilitators and admins can create learner accounts." };
   }
 
-  const parsed = schema.safeParse({
-    name: formData.get("name"),
-    username: formData.get("username"),
-  });
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  const emailOptional = await isFeatureEnabled(session.user.organizationId, "learner_email_optional");
+  const result = await createUser("LEARNER", formData, emailOptional);
+  revalidatePath("/facilitator/learners/new");
+  revalidatePath("/admin/people");
+  return result;
+}
+
+export async function createFacilitatorAction(
+  _prevState: CreateUserState,
+  formData: FormData
+): Promise<CreateUserState> {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "ADMIN") {
+    return { ok: false, error: "Only admins can create facilitator accounts." };
   }
 
-  const existing = await prisma.user.findUnique({ where: { username: parsed.data.username } });
-  if (existing) return { ok: false, error: "That username is already taken." };
+  const emailOptional = await isFeatureEnabled(session.user.organizationId, "facilitator_email_optional");
+  const result = await createUser("FACILITATOR", formData, emailOptional);
+  revalidatePath("/admin/people");
+  return result;
+}
+
+export type ResetPasswordState =
+  | { ok: true; identifier: string; password: string }
+  | { ok: false; error: string }
+  | undefined;
+
+export async function resetPasswordAction(
+  targetUserId: string,
+  _prevState: ResetPasswordState
+): Promise<ResetPasswordState> {
+  const session = await auth();
+  if (!session?.user) return { ok: false, error: "Not signed in." };
+
+  const target = await prisma.user.findUnique({ where: { id: targetUserId } });
+  if (!target || target.organizationId !== session.user.organizationId) {
+    return { ok: false, error: "Account not found." };
+  }
+
+  const isAdmin = session.user.role === "ADMIN";
+  const isFacilitatorResettingLearner = session.user.role === "FACILITATOR" && target.role === "LEARNER";
+  if (!isAdmin && !isFacilitatorResettingLearner) {
+    return { ok: false, error: "You don't have permission to reset this password." };
+  }
 
   const tempPassword = generateTempPassword();
-
-  await prisma.user.create({
-    data: {
-      organizationId: session.user.organizationId,
-      role: "LEARNER",
-      username: parsed.data.username,
-      name: parsed.data.name,
-      passwordHash: await hashPassword(tempPassword),
-      createdById: session.user.id,
-    },
+  await prisma.user.update({
+    where: { id: targetUserId },
+    data: { passwordHash: await hashPassword(tempPassword) },
   });
 
-  revalidatePath("/facilitator/learners/new");
-  return { ok: true, username: parsed.data.username, password: tempPassword };
+  revalidatePath("/admin/people");
+  revalidatePath("/facilitator");
+  return { ok: true, identifier: target.email ?? target.username, password: tempPassword };
 }

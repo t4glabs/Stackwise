@@ -4,7 +4,8 @@ import { getPrimaryOrganization } from "@/lib/org";
 import { getFlags } from "@/lib/flags";
 import { Container } from "@/components/ui/container";
 import { Button } from "@/components/ui/button";
-import { CourseCard } from "@/components/course-card";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { CourseCard, CourseGrid } from "@/components/course-card";
 
 export default async function HomePage() {
   const org = await getPrimaryOrganization();
@@ -19,20 +20,17 @@ export default async function HomePage() {
 
   return (
     <div>
-      <section className="border-b border-grey-200 bg-grey-50">
-        <Container className="flex flex-col gap-5 py-20">
-          <span className="text-xs font-bold uppercase tracking-widest text-grey-600">
-            {org.name}
-          </span>
-          <h1 className="max-w-2xl text-4xl font-bold leading-tight tracking-tight text-ink text-balance">
-            Courses and transition programs, in one place.
+      <section>
+        <Container className="flex flex-col gap-6 py-24">
+          <Eyebrow>{org.name}</Eyebrow>
+          <h1 className="max-w-2xl text-balance text-[48px] font-semibold leading-[1.05] tracking-[-0.01em] text-ink sm:text-[52px]">
+            {org.heroHeading}
           </h1>
-          <p className="max-w-xl text-base text-grey-700">
-            Every course here is written and maintained in our wiki. This is where you
-            enroll, track progress, and pick up where you left off.
+          <p className="max-w-lg font-serif text-[17px] leading-relaxed text-stone-600">
+            {org.heroDescription}
           </p>
-          <div className="flex gap-3 pt-2">
-            <Button size="lg" asChild>
+          <div className="pt-2">
+            <Button variant="accent" size="lg" asChild>
               <Link href={flags.public_catalog ? "/courses" : "/login"}>
                 Browse courses
               </Link>
@@ -42,17 +40,23 @@ export default async function HomePage() {
       </section>
 
       {courses.length > 0 ? (
-        <section>
-          <Container className="flex flex-col gap-6 py-14">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold tracking-tight text-ink">
-                Featured courses
-              </h2>
-              <Link href="/courses" className="text-sm font-medium text-accent hover:underline">
-                View all
+        <section className="border-t border-stone-200">
+          <Container className="flex flex-col gap-8 py-16">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <Eyebrow className="mb-2">On the catalog</Eyebrow>
+                <h2 className="text-[22px] font-semibold tracking-tight text-ink">
+                  Featured courses
+                </h2>
+              </div>
+              <Link
+                href="/courses"
+                className="shrink-0 text-[14px] font-medium text-accent hover:underline"
+              >
+                View all →
               </Link>
             </div>
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <CourseGrid>
               {courses.map((course) => (
                 <CourseCard
                   key={course.id}
@@ -64,7 +68,7 @@ export default async function HomePage() {
                   programName={course.program?.name}
                 />
               ))}
-            </div>
+            </CourseGrid>
           </Container>
         </section>
       ) : null}

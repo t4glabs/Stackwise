@@ -14,8 +14,8 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
       <input type="hidden" name="callbackUrl" value={callbackUrl} />
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="username">Username</Label>
-        <Input id="username" name="username" autoComplete="username" required />
+        <Label htmlFor="identifier">Email or username</Label>
+        <Input id="identifier" name="identifier" autoComplete="username" required />
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -25,7 +25,7 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
 
       {error ? <p className="text-sm text-danger">{error}</p> : null}
 
-      <Button type="submit" disabled={pending} className="mt-2">
+      <Button variant="accent" type="submit" disabled={pending} className="mt-2 w-full">
         {pending ? "Signing in…" : "Log in"}
       </Button>
     </form>

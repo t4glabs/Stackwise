@@ -20,10 +20,44 @@ model Organization {
   bookstackBaseUrl String
   createdAt        DateTime @default(now())
 
+  // Branding — every NGO deployment of this codebase runs on its own server with its
+  // own database, so these live here (editable from /admin/settings) rather than as
+  // hardcoded strings, letting the same code serve any org. See DESIGN_SYSTEM.md.
+  brandName       String  @default("WeLive Learning")
+  accentColor     String  @default("#7358b3")
+  heroHeading     String  @default("Courses and transition programs, in one place.")
+  heroDescription String  @default("Every course here is written and maintained in our wiki. This is where you enroll, track progress, and pick up where you left off.")
+  wikiLinkLabel   String  @default("the wiki")
+  // Relative paths under /uploads (served from /public) — null falls back to the
+  // generated header mark and Next's default favicon respectively.
+  logoUrl         String?
+  faviconUrl      String?
+
   users        User[]
   programs     Program[]
   courses      Course[]
   featureFlags FeatureFlag[]
+  customLinks  CustomLink[]
+}
+
+enum LinkPlacement {
+  NAV
+  FOOTER
+}
+
+// Admin-managed extra links in the header nav or footer — e.g. a "Donate" link or a
+// partner site. See /admin/settings.
+model CustomLink {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  placement    LinkPlacement
+  label        String
+  url          String
+  openInNewTab Boolean       @default(true)
+  order        Int           @default(0)
+  createdAt    DateTime      @default(now())
 }
 
 enum Role {
@@ -39,11 +73,15 @@ model User {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
 
-  role         Role   @default(LEARNER)
-  username     String @unique
+  role         Role    @default(LEARNER)
+  // The technical login key — always set, but only ever shown to a person when they
+  // have no email (see lib/username.ts). When email is present it's auto-derived and
+  // effectively invisible; login accepts either. See lib/flags.ts for the per-role
+  // "email optional" settings that decide which path a given account takes.
+  username     String  @unique
   passwordHash String
   name         String
-  email        String?
+  email        String? @unique
   phone        String?
 
   // Facilitator/admin who created this account — supports youth without personal email.
@@ -100,6 +138,11 @@ model Course {
   durationLabel    String?
   order            Int        @default(0)
   published        Boolean    @default(false)
+  // Off by default. When on, learners get "download as .docx" options on the course
+  // page — the whole course or a single chapter — to fill in offline and share back.
+  // Only meaningful for SELF_PACED/FACILITATED courses (there's nothing local to
+  // export for EXTERNAL_LINK ones).
+  downloadableWorkbook Boolean @default(false)
   lastSyncedAt     DateTime?
 
   lessons      Lesson[]
@@ -119,6 +162,10 @@ model Lesson {
   course             Course  @relation(fields: [courseId], references: [id])
   bookstackPageId    Int
   bookstackChapterId Int?
+  // Denormalized from the BookStack chapter, purely for labeling per-chapter
+  // workbook downloads (e.g. "Download Chapter 2: Money Management"). Null for
+  // pages that sit directly on the book with no chapter.
+  chapterTitle       String?
   title              String
   slug               String
   order              Int     @default(0)

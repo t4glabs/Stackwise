@@ -1,4 +1,4 @@
-# Deploying welive-lms to the Hetzner box
+# Deploying Stackwise to the Hetzner box
 
 This sits next to your existing Ghost and Strapi/Next.js apps in `/var/www`, as its own
 folder, its own pm2 process, and its own Postgres database. Nothing here touches those
@@ -10,9 +10,9 @@ other apps.
 # Postgres, if you don't already have one running for another project
 sudo apt update && sudo apt install -y postgresql
 
-sudo -u postgres psql -c "CREATE DATABASE welive_lms;"
-sudo -u postgres psql -c "CREATE USER welive_lms WITH ENCRYPTED PASSWORD '<pick-a-password>';"
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE welive_lms TO welive_lms;"
+sudo -u postgres psql -c "CREATE DATABASE stackwise;"
+sudo -u postgres psql -c "CREATE USER stackwise WITH ENCRYPTED PASSWORD '<pick-a-password>';"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE stackwise TO stackwise;"
 ```
 
 If Strapi already runs a Postgres instance on this box, reuse it — just add a new
@@ -24,8 +24,8 @@ Node 20.9+ is required (Next.js 16). Confirm with `node -v`; install/upgrade via
 
 ```bash
 cd /var/www
-git clone <your-repo-url> welive-lms   # or scp the project up
-cd welive-lms
+git clone <your-repo-url> stackwise   # or scp the project up
+cd stackwise
 npm ci
 ```
 
@@ -39,7 +39,7 @@ cp .env.example .env
 
 ```bash
 # .env
-DATABASE_URL="postgresql://welive_lms:<password>@localhost:5432/welive_lms"
+DATABASE_URL="postgresql://stackwise:<password>@localhost:5432/stackwise"
 AUTH_SECRET="$(openssl rand -base64 32)"
 
 BOOKSTACK_BASE_URL="https://books.humansofwelive.org"
@@ -137,16 +137,16 @@ by this project. Back up this app's Postgres database (enrollment/progress/accou
 ```bash
 crontab -e
 # nightly at 2am
-0 2 * * * pg_dump welive_lms | gzip > /var/backups/welive-lms-$(date +\%F).sql.gz
+0 2 * * * pg_dump stackwise | gzip > /var/backups/stackwise-$(date +\%F).sql.gz
 ```
 
 ## Redeploying after changes
 
 ```bash
-cd /var/www/welive-lms
+cd /var/www/stackwise
 git pull
 npm ci
 npm run db:deploy   # only if there are new migrations
 npm run build
-pm2 reload welive-lms
+pm2 reload stackwise
 ```

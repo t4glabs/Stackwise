@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { getPrimaryOrganization } from "@/lib/org";
 import { getFlags } from "@/lib/flags";
 import { Container } from "@/components/ui/container";
-import { CourseCard } from "@/components/course-card";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { CourseCard, CourseGrid } from "@/components/course-card";
 
 export default async function CoursesPage() {
   const org = await getPrimaryOrganization();
@@ -28,25 +29,28 @@ export default async function CoursesPage() {
   }
 
   return (
-    <Container className="flex flex-col gap-10 py-14">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-ink">Courses</h1>
-        <p className="mt-2 max-w-xl text-sm text-grey-700">
+    <Container className="flex flex-col gap-14 py-16">
+      <div className="flex flex-col gap-3">
+        <Eyebrow>Catalog</Eyebrow>
+        <h1 className="text-[36px] font-semibold tracking-[-0.01em] text-ink">Courses</h1>
+        <p className="max-w-lg font-serif text-[16px] leading-relaxed text-stone-600">
           Written and maintained in the WeLive wiki — this catalog updates automatically
-          as courses are tagged and published there.
+          as courses are set up there.
         </p>
       </div>
 
       {courses.length === 0 ? (
-        <p className="text-sm text-grey-600">
-          No courses are published yet. Tag a Book <code className="rounded bg-grey-100 px-1.5 py-0.5">lms_publish=true</code> in
-          BookStack and it will show up here after the next sync.
+        <p className="max-w-md text-[15px] text-stone-600">
+          No courses are published yet. An admin can turn one on from{" "}
+          <span className="font-medium text-ink">Admin → Courses</span> once it&apos;s ready.
         </p>
       ) : (
         [...grouped.entries()].map(([program, programCourses]) => (
           <section key={program} className="flex flex-col gap-5">
-            <h2 className="text-lg font-semibold tracking-tight text-ink">{program}</h2>
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <h2 className="text-[13px] font-semibold uppercase tracking-[0.13em] text-stone-600">
+              {program}
+            </h2>
+            <CourseGrid>
               {programCourses.map((course) => (
                 <CourseCard
                   key={course.id}
@@ -57,7 +61,7 @@ export default async function CoursesPage() {
                   durationLabel={course.durationLabel}
                 />
               ))}
-            </div>
+            </CourseGrid>
           </section>
         ))
       )}
