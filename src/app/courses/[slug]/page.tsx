@@ -9,8 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { ProgressBar } from "@/components/progress-bar";
+import { WorkbookDownloads, type WorkbookChapter } from "@/components/workbook-downloads";
 import { enrollInCourse, markCourseComplete } from "@/lib/actions/enrollment-actions";
-import { CheckCircle2, Circle, ExternalLink, Download } from "lucide-react";
+import { CheckCircle2, Circle, ExternalLink } from "lucide-react";
 
 const TYPE_LABEL: Record<string, string> = {
   SELF_PACED: "Self-paced",
@@ -77,10 +78,6 @@ export default async function CourseDetailPage({
         ) : null}
       </div>
 
-      {course.downloadableWorkbook ? (
-        <WorkbookDownloads slug={slug} lessons={course.lessons} />
-      ) : null}
-
       {course.type === "EXTERNAL_LINK" ? (
         <ExternalCourseAction
           courseId={course.id}
@@ -102,18 +99,18 @@ export default async function CourseDetailPage({
           slug={slug}
         />
       )}
+
+      {course.downloadableWorkbook ? (
+        <WorkbookDownloads slug={slug} chapters={getWorkbookChapters(course.lessons)} />
+      ) : null}
     </Container>
   );
 }
 
-function WorkbookDownloads({
-  slug,
-  lessons,
-}: {
-  slug: string;
-  lessons: { bookstackChapterId: number | null; chapterTitle: string | null }[];
-}) {
-  const chapters: { id: number; title: string }[] = [];
+function getWorkbookChapters(
+  lessons: { bookstackChapterId: number | null; chapterTitle: string | null }[]
+): WorkbookChapter[] {
+  const chapters: WorkbookChapter[] = [];
   const seen = new Set<number>();
   for (const lesson of lessons) {
     if (lesson.bookstackChapterId != null && !seen.has(lesson.bookstackChapterId)) {
@@ -121,31 +118,7 @@ function WorkbookDownloads({
       chapters.push({ id: lesson.bookstackChapterId, title: lesson.chapterTitle ?? "Untitled chapter" });
     }
   }
-
-  return (
-    <div className="flex flex-col gap-4 rounded-card border border-stone-200 bg-white p-6">
-      <div>
-        <Eyebrow className="mb-1.5">Offline use</Eyebrow>
-        <p className="text-[15px] text-stone-600">
-          Get this as a Word document to fill in and share back — no internet needed.
-        </p>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" asChild>
-          <a href={`/api/courses/${slug}/export`}>
-            <Download className="size-4" /> Whole course (.docx)
-          </a>
-        </Button>
-        {chapters.map((chapter) => (
-          <Button key={chapter.id} variant="outline" size="sm" asChild>
-            <a href={`/api/courses/${slug}/export?chapter=${chapter.id}`}>
-              <Download className="size-4" /> {chapter.title} (.docx)
-            </a>
-          </Button>
-        ))}
-      </div>
-    </div>
-  );
+  return chapters;
 }
 
 function ExternalCourseAction({
