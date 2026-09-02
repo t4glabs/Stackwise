@@ -98,3 +98,11 @@ body {
   overflow-x: auto;
   max-width: 100%;
 }
+
+/* Same reasoning for unbroken runs of text with no natural wrap point — most commonly
+   a "fill in the blank" line of underscores, but also long URLs or unspaced strings.
+   Without this, a single such run forces the whole page into horizontal scroll on
+   narrow screens instead of wrapping inside its own paragraph. */
+.prose {
+  overflow-wrap: anywhere;
+}
