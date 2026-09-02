@@ -54,12 +54,19 @@ export async function GET(
     lessons.map(async (lesson) => {
       const page = await getPage(lesson.bookstackPageId);
       // Chapter headings are only meaningful in the whole-course doc — a single
-      // chapter's own export is already titled by that chapter's name.
-      return { heading: lesson.title, chapterTitle: chapterParam ? null : lesson.chapterTitle, html: page.html };
+      // chapter's own export is already titled by that chapter's name, and its
+      // description goes in the doc intro instead (see introHtml below).
+      return {
+        heading: lesson.title,
+        chapterTitle: chapterParam ? null : lesson.chapterTitle,
+        chapterDescriptionHtml: chapterParam ? null : lesson.chapterDescriptionHtml,
+        html: page.html,
+      };
     })
   );
 
-  const buffer = await generateWorkbookDocx(docTitle, sections);
+  const introHtml = chapterParam ? (lessons[0].chapterDescriptionHtml ?? null) : null;
+  const buffer = await generateWorkbookDocx(docTitle, sections, introHtml);
   const filenameBase = chapterParam ? `${course.slug}-${slugify(docTitle)}` : course.slug;
 
   return new Response(new Uint8Array(buffer), {

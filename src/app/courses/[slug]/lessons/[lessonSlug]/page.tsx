@@ -6,6 +6,7 @@ import { getPrimaryOrganization } from "@/lib/org";
 import { getPage, bookstackIsConfigured } from "@/lib/bookstack";
 import { Container } from "@/components/ui/container";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { markLessonComplete } from "@/lib/actions/enrollment-actions";
 import { ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
 
@@ -49,6 +50,14 @@ export default async function LessonPage({
   const prevLesson = course.lessons[lessonIndex - 1];
   const nextLesson = course.lessons[lessonIndex + 1];
 
+  // True the moment a learner steps into a new chapter — either it's the very first
+  // lesson of the course, or the chapter differs from the one they were just reading.
+  // That's the exact spot the chapter's own BookStack description belongs: framing
+  // for the session that's about to start, not buried in the syllabus they've
+  // already scrolled past.
+  const isChapterStart =
+    lesson.bookstackChapterId != null && prevLesson?.bookstackChapterId !== lesson.bookstackChapterId;
+
   return (
     <Container className="flex max-w-[720px] flex-col gap-10 py-16">
       <Link
@@ -57,6 +66,18 @@ export default async function LessonPage({
       >
         <ArrowLeft className="size-4" /> {course.title}
       </Link>
+
+      {isChapterStart ? (
+        <div className="flex flex-col gap-2 rounded-card border border-accent/20 bg-accent-soft p-6">
+          <Eyebrow>Starting {lesson.chapterTitle}</Eyebrow>
+          {lesson.chapterDescriptionHtml ? (
+            <div
+              className="prose max-w-none font-serif text-[15px] leading-relaxed text-ink prose-p:my-0"
+              dangerouslySetInnerHTML={{ __html: lesson.chapterDescriptionHtml }}
+            />
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-2 border-b border-stone-200 pb-8">
         <span className="font-mono text-[12px] uppercase tracking-[0.1em] text-grey-400">

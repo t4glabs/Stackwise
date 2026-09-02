@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getBook, listAllBooks, bookstackIsConfigured } from "@/lib/bookstack";
+import { getBook, getChapter, listAllBooks, bookstackIsConfigured } from "@/lib/bookstack";
 import { parseCourseTags } from "@/lib/tags";
 import { slugify } from "@/lib/slugify";
 import type { Organization } from "../generated/prisma/client";
@@ -84,14 +84,19 @@ export async function syncCourses(org: Organization): Promise<SyncResult> {
     }
 
     // Flatten chapters into lessons: a page directly on the book, or a page inside a chapter.
-    // The chapter's own name rides along purely to label per-chapter workbook downloads.
+    // The chapter's own name and intro description ride along on every page in that
+    // chapter (denormalized, same pattern as chapterTitle) so a learner sees chapter
+    // framing the moment they land on its first page — see chapterDescriptionHtml on
+    // the Lesson model. One extra API call per chapter, not per page.
     let order = 0;
     for (const item of book.contents) {
       if (item.type === "page") {
-        await upsertLesson(courseId, item.id, null, null, item.name, item.slug, order++);
+        await upsertLesson(courseId, item.id, null, null, null, item.name, item.slug, order++);
       } else {
+        const chapter = await getChapter(item.id);
+        const description = chapter.description_html || null;
         for (const page of item.pages) {
-          await upsertLesson(courseId, page.id, item.id, item.name, page.name, page.slug, order++);
+          await upsertLesson(courseId, page.id, item.id, item.name, description, page.name, page.slug, order++);
         }
       }
     }
@@ -110,6 +115,7 @@ async function upsertLesson(
   bookstackPageId: number,
   bookstackChapterId: number | null,
   chapterTitle: string | null,
+  chapterDescriptionHtml: string | null,
   title: string,
   slug: string,
   order: number
@@ -121,10 +127,11 @@ async function upsertLesson(
       bookstackPageId,
       bookstackChapterId,
       chapterTitle,
+      chapterDescriptionHtml,
       title,
       slug,
       order,
     },
-    update: { title, slug, order, bookstackChapterId, chapterTitle },
+    update: { title, slug, order, bookstackChapterId, chapterTitle, chapterDescriptionHtml },
   });
 }

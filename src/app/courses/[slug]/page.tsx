@@ -203,6 +203,7 @@ type SyllabusLesson = {
   slug: string;
   bookstackChapterId: number | null;
   chapterTitle: string | null;
+  chapterDescriptionHtml: string | null;
 };
 
 // Consecutive lessons sharing a chapter (sync.ts always emits a chapter's pages
@@ -211,7 +212,7 @@ type SyllabusLesson = {
 // so a course with no BookStack chapters at all still renders as a flat list.
 type SyllabusBlock =
   | { type: "lesson"; lesson: SyllabusLesson }
-  | { type: "chapter"; chapterTitle: string; lessons: SyllabusLesson[] };
+  | { type: "chapter"; chapterTitle: string; chapterDescriptionHtml: string | null; lessons: SyllabusLesson[] };
 
 function groupSyllabus(lessons: SyllabusLesson[]): SyllabusBlock[] {
   const blocks: SyllabusBlock[] = [];
@@ -224,7 +225,12 @@ function groupSyllabus(lessons: SyllabusLesson[]): SyllabusBlock[] {
     if (last?.type === "chapter" && last.lessons[0]?.bookstackChapterId === lesson.bookstackChapterId) {
       last.lessons.push(lesson);
     } else {
-      blocks.push({ type: "chapter", chapterTitle: lesson.chapterTitle ?? "Untitled chapter", lessons: [lesson] });
+      blocks.push({
+        type: "chapter",
+        chapterTitle: lesson.chapterTitle ?? "Untitled chapter",
+        chapterDescriptionHtml: lesson.chapterDescriptionHtml,
+        lessons: [lesson],
+      });
     }
   }
   return blocks;
@@ -333,9 +339,15 @@ function SyllabusList({
         }
         return (
           <div key={`chapter-${i}`} className="flex flex-col">
-            <p className="bg-grey-50 px-5 py-2.5 text-[13px] font-semibold text-grey-700">
-              {block.chapterTitle}
-            </p>
+            <div className="flex flex-col gap-1 bg-grey-50 px-5 py-3">
+              <p className="text-[13px] font-semibold text-grey-700">{block.chapterTitle}</p>
+              {block.chapterDescriptionHtml ? (
+                <div
+                  className="prose prose-sm max-w-none text-[13px] leading-relaxed text-grey-600 prose-p:my-0"
+                  dangerouslySetInnerHTML={{ __html: block.chapterDescriptionHtml }}
+                />
+              ) : null}
+            </div>
             <div className="flex flex-col divide-y divide-grey-200">
               {block.lessons.map((lesson) => {
                 return (

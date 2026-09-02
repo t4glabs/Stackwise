@@ -49,6 +49,12 @@ export type BookStackPageDetail = {
   updated_at: string;
 };
 
+export type BookStackChapterDetail = {
+  id: number;
+  name: string;
+  description_html: string;
+};
+
 class BookStackConfigError extends Error {}
 export class BookStackApiError extends Error {
   constructor(
@@ -134,6 +140,12 @@ export async function getBook(id: number): Promise<BookStackBookDetail> {
 
 export async function getPage(id: number): Promise<BookStackPageDetail> {
   return bookstackFetch<BookStackPageDetail>(`/pages/${id}`);
+}
+
+// The chapter's own intro text isn't included in GET /books/{id}'s contents array —
+// it needs this separate call. sync.ts calls it once per chapter, not once per page.
+export async function getChapter(id: number): Promise<BookStackChapterDetail> {
+  return bookstackFetch<BookStackChapterDetail>(`/chapters/${id}`);
 }
 
 // Writes the given lms_* tags onto a book, preserving any other (non-lms_) tags that

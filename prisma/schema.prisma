@@ -166,6 +166,11 @@ model Lesson {
   // workbook downloads (e.g. "Download Chapter 2: Money Management"). Null for
   // pages that sit directly on the book with no chapter.
   chapterTitle       String?
+  // The chapter's own intro text in BookStack (Chapter > description_html) —
+  // shown to a learner the moment they cross into this chapter's first page, so
+  // starting a new session doesn't feel like an unexplained jump. Null when the
+  // chapter has no description set, or the page has no chapter.
+  chapterDescriptionHtml String?
   title              String
   slug               String
   order              Int     @default(0)
