@@ -1,26 +1,68 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-ink: #202226;
+  --color-grey-50: #f9f9fb;
+  --color-grey-100: #f4f5f7;
+  --color-grey-200: #eff0f3;
+  --color-grey-300: #e3e5ea;
+  --color-grey-400: #d6d9e0;
+  --color-grey-500: #c0c4cf;
+  --color-grey-600: #adb2bf;
+  --color-grey-700: #8f96a7;
+  --color-grey-800: #6b7280;
+  --color-grey-900: #3d4451;
+
+  --color-accent: #3167d6;
+  --color-accent-soft: #eaf0fd;
+  --color-success: #1f9d4a;
+  --color-success-soft: #e8f7ee;
+  --color-warning: #a06a00;
+  --color-warning-soft: #fbf1d9;
+  --color-danger: #c22222;
+  --color-danger-soft: #fbe9e9;
+
+  --background: #fdfdfc;
+  --foreground: var(--color-ink);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-ink: var(--color-ink);
+  --color-grey-50: var(--color-grey-50);
+  --color-grey-100: var(--color-grey-100);
+  --color-grey-200: var(--color-grey-200);
+  --color-grey-300: var(--color-grey-300);
+  --color-grey-400: var(--color-grey-400);
+  --color-grey-500: var(--color-grey-500);
+  --color-grey-600: var(--color-grey-600);
+  --color-grey-700: var(--color-grey-700);
+  --color-grey-800: var(--color-grey-800);
+  --color-grey-900: var(--color-grey-900);
+  --color-accent: var(--color-accent);
+  --color-accent-soft: var(--color-accent-soft);
+  --color-success: var(--color-success);
+  --color-success-soft: var(--color-success-soft);
+  --color-warning: var(--color-warning);
+  --color-warning-soft: var(--color-warning-soft);
+  --color-danger: var(--color-danger);
+  --color-danger-soft: var(--color-danger-soft);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-geist-mono);
+
+  --radius-control: 6px;
+  --radius-card: 12px;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), -apple-system, "Segoe UI", sans-serif;
+}
+
+* {
+  border-color: var(--color-grey-200);
 }

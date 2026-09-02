@@ -1,0 +1,219 @@
+// WeLive LMS domain model.
+// BookStack remains the content source of truth (books/chapters/pages, fetched live via API).
+// Everything here is LMS-native state BookStack has no concept of: accounts, enrollment, progress, flags.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// One row per NGO deployment today (WeLive). Kept as a real table, not a singleton,
+// so a future multi-tenant deployment doesn't require a schema change.
+model Organization {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String   @unique
+  bookstackBaseUrl String
+  createdAt        DateTime @default(now())
+
+  users        User[]
+  programs     Program[]
+  courses      Course[]
+  featureFlags FeatureFlag[]
+}
+
+enum Role {
+  LEARNER
+  FACILITATOR
+  ADMIN
+}
+
+// Learners and facilitators live here — never in BookStack. See plan: two separate
+// user pools, since BookStack has no OIDC/session-sharing capability as a provider.
+model User {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  role         Role   @default(LEARNER)
+  username     String @unique
+  passwordHash String
+  name         String
+  email        String?
+  phone        String?
+
+  // Facilitator/admin who created this account — supports youth without personal email.
+  createdById String?
+
+  createdAt DateTime @default(now())
+
+  enrollments         Enrollment[]
+  progress            Progress[]
+  facilitatingCourses CourseFacilitator[]
+  cohortsFacilitated  Cohort[]            @relation("CohortFacilitator")
+  certificates        Certificate[]
+
+  @@index([organizationId])
+}
+
+model Program {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  name String
+  slug String
+
+  courses Course[]
+
+  @@unique([organizationId, slug])
+}
+
+enum CourseType {
+  SELF_PACED
+  FACILITATED
+  EXTERNAL_LINK
+}
+
+// One row per BookStack Book that is tagged lms_publish=true. Metadata only —
+// lesson/page bodies are fetched live from BookStack, never duplicated here.
+model Course {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  programId      String?
+  program        Program?     @relation(fields: [programId], references: [id])
+
+  bookstackBookId Int
+  slug            String
+  title           String
+  description     String?
+  coverImageUrl   String?
+
+  type             CourseType @default(SELF_PACED)
+  externalUrl      String? // used when type = EXTERNAL_LINK (e.g. a Unithena course link)
+  facilitatorEmail String? // default facilitator tagged in BookStack, may differ from assigned facilitators
+  durationLabel    String?
+  order            Int        @default(0)
+  published        Boolean    @default(false)
+  lastSyncedAt     DateTime?
+
+  lessons      Lesson[]
+  enrollments  Enrollment[]
+  cohorts      Cohort[]
+  facilitators CourseFacilitator[]
+  certificates Certificate[]
+
+  @@unique([organizationId, bookstackBookId])
+  @@unique([organizationId, slug])
+}
+
+// One row per BookStack Page within a published course, used only for progress tracking.
+model Lesson {
+  id                 String  @id @default(cuid())
+  courseId           String
+  course             Course  @relation(fields: [courseId], references: [id])
+  bookstackPageId    Int
+  bookstackChapterId Int?
+  title              String
+  slug               String
+  order              Int     @default(0)
+
+  progress Progress[]
+
+  @@unique([courseId, bookstackPageId])
+}
+
+enum EnrollmentSource {
+  SELF
+  ASSIGNED
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  WITHDRAWN
+}
+
+model Enrollment {
+  id       String @id @default(cuid())
+  learnerId String
+  learner  User   @relation(fields: [learnerId], references: [id])
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id])
+  cohortId String?
+  cohort   Cohort? @relation(fields: [cohortId], references: [id])
+
+  source      EnrollmentSource @default(SELF)
+  status      EnrollmentStatus @default(ACTIVE)
+  enrolledAt  DateTime         @default(now())
+  completedAt DateTime?
+
+  @@unique([learnerId, courseId])
+}
+
+model Progress {
+  id          String    @id @default(cuid())
+  learnerId   String
+  learner     User      @relation(fields: [learnerId], references: [id])
+  lessonId    String
+  lesson      Lesson    @relation(fields: [lessonId], references: [id])
+  viewedAt    DateTime?
+  completedAt DateTime?
+
+  @@unique([learnerId, lessonId])
+}
+
+// Optional batch grouping for facilitated programs. Gated by the `cohorts` feature flag.
+model Cohort {
+  id       String  @id @default(cuid())
+  courseId String
+  course   Course  @relation(fields: [courseId], references: [id])
+  name     String
+
+  facilitatorId String?
+  facilitator   User?   @relation("CohortFacilitator", fields: [facilitatorId], references: [id])
+
+  startDate DateTime?
+  endDate   DateTime?
+
+  enrollments Enrollment[]
+}
+
+model CourseFacilitator {
+  id            String @id @default(cuid())
+  courseId      String
+  course        Course @relation(fields: [courseId], references: [id])
+  facilitatorId String
+  facilitator   User   @relation(fields: [facilitatorId], references: [id])
+
+  @@unique([courseId, facilitatorId])
+}
+
+// Org-scoped module toggles — read by both route guards and nav rendering.
+// See plan section 06: "turn it off if you don't need it".
+model FeatureFlag {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  key            String
+  enabled        Boolean      @default(true)
+
+  @@unique([organizationId, key])
+}
+
+// Gated by the `certificates` feature flag (off by default at WeLive launch).
+model Certificate {
+  id        String   @id @default(cuid())
+  learnerId String
+  learner   User     @relation(fields: [learnerId], references: [id])
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id])
+  issuedAt  DateTime @default(now())
+
+  @@unique([learnerId, courseId])
+}
