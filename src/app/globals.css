@@ -91,12 +91,22 @@ body {
 }
 
 /* BookStack page content (lesson bodies) is arbitrary rich-text HTML we don't control —
-   a wide table shouldn't be able to push the whole page into horizontal scroll. Scroll
-   the table itself instead. */
-.prose table {
-  display: block;
-  overflow-x: auto;
+   a wide table shouldn't be able to push the whole page into horizontal scroll. Each
+   <table> is wrapped in this div server-side (see wrapTablesForScroll in lib/html.ts)
+   so the scroll is scoped to the table without breaking its actual grid layout — unlike
+   forcing the <table> itself to display:block, which strips its table layout entirely. */
+.table-scroll {
   max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Video embeds (YouTube etc.) come with fixed width/height attributes from BookStack's
+   editor — e.g. width="912" — that don't shrink on narrow screens. Cap the width and
+   derive height from a 16:9 ratio, which covers the vast majority of embeds. */
+.prose iframe {
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
 }
 
 /* Same reasoning for unbroken runs of text with no natural wrap point — most commonly

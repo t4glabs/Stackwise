@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getPrimaryOrganization } from "@/lib/org";
 import { getPage, bookstackIsConfigured } from "@/lib/bookstack";
+import { wrapTablesForScroll } from "@/lib/html";
 import { Container } from "@/components/ui/container";
 import { Button } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/eyebrow";
@@ -43,7 +44,7 @@ export default async function LessonPage({
   });
 
   const html = bookstackIsConfigured()
-    ? (await getPage(lesson.bookstackPageId)).html
+    ? wrapTablesForScroll((await getPage(lesson.bookstackPageId)).html)
     : `<p><em>Connect a BookStack API token in .env to display real lesson content here — see DEPLOY.md. This is placeholder text for "${lesson.title}".</em></p>`;
 
   const coursePath = `/courses/${slug}`;
@@ -73,7 +74,7 @@ export default async function LessonPage({
           {lesson.chapterDescriptionHtml ? (
             <div
               className="prose max-w-none font-serif text-[15px] leading-relaxed text-ink prose-p:my-0"
-              dangerouslySetInnerHTML={{ __html: lesson.chapterDescriptionHtml }}
+              dangerouslySetInnerHTML={{ __html: wrapTablesForScroll(lesson.chapterDescriptionHtml) }}
             />
           ) : null}
         </div>

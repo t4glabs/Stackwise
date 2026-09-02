@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { ProgressBar } from "@/components/progress-bar";
 import { WorkbookDownloads, type WorkbookChapter } from "@/components/workbook-downloads";
+import { wrapTablesForScroll } from "@/lib/html";
 import { enrollInCourse, markCourseComplete } from "@/lib/actions/enrollment-actions";
 import { CheckCircle2, Circle, ExternalLink } from "lucide-react";
 
@@ -317,7 +318,7 @@ function SyllabusList({
               {block.chapterDescriptionHtml ? (
                 <div
                   className="prose prose-sm max-w-none text-[13px] leading-relaxed text-grey-600 prose-p:my-0"
-                  dangerouslySetInnerHTML={{ __html: block.chapterDescriptionHtml }}
+                  dangerouslySetInnerHTML={{ __html: wrapTablesForScroll(block.chapterDescriptionHtml) }}
                 />
               ) : null}
             </div>
