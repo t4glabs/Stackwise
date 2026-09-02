@@ -62,7 +62,7 @@ export default async function AdminCourseEditPage({
   const coursePath = `/admin/courses/${course.id}`;
 
   return (
-    <div className="flex min-w-0 max-w-xl flex-col gap-6">
+    <div className="flex min-w-0 max-w-4xl flex-col gap-6">
       <Link
         href="/admin/courses"
         className="flex w-fit items-center gap-1.5 text-[13px] font-medium text-grey-600 hover:text-ink"
