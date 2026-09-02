@@ -39,6 +39,7 @@ export default async function CourseDetailPage({
   });
 
   if (!course || !course.published) notFound();
+  if (course.type === "EXTERNAL_LINK" && !flags.external_link_courses) notFound();
 
   const coursePath = `/courses/${slug}`;
 

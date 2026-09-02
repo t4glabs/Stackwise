@@ -16,18 +16,27 @@ export default async function FacilitatorPage() {
   const session = await auth();
   const flags = await getFlags(session!.user.organizationId);
 
-  const assignments = await prisma.courseFacilitator.findMany({
-    where: { facilitatorId: session!.user.id },
-    include: {
-      course: {
-        include: {
-          lessons: true,
-          enrollments: { include: { learner: true } },
-          certificates: true,
-        },
-      },
-    },
-  });
+  // With facilitator_assignment off, there's no per-course scoping concept — every
+  // facilitator manages every published course instead of only ones an admin
+  // explicitly assigned them to (matches canManageCourseRoster in people-permissions.ts).
+  const courseInclude = {
+    lessons: true,
+    enrollments: { include: { learner: true } },
+    certificates: true,
+  } as const;
+
+  const courses = flags.facilitator_assignment
+    ? (
+        await prisma.courseFacilitator.findMany({
+          where: { facilitatorId: session!.user.id },
+          include: { course: { include: courseInclude } },
+        })
+      ).map((a) => a.course)
+    : await prisma.course.findMany({
+        where: { organizationId: session!.user.organizationId, published: true },
+        include: courseInclude,
+        orderBy: { title: "asc" },
+      });
 
   return (
     <Container className="flex flex-col gap-8 py-12">
@@ -41,14 +50,15 @@ export default async function FacilitatorPage() {
         </Button>
       </div>
 
-      {assignments.length === 0 ? (
+      {courses.length === 0 ? (
         <p className="text-sm text-grey-600">
-          You&apos;re not assigned to any courses yet — ask an admin to assign you from
-          the course&apos;s settings.
+          {flags.facilitator_assignment
+            ? "You're not assigned to any courses yet — ask an admin to assign you from the course's settings."
+            : "No published courses yet."}
         </p>
       ) : (
         <div className="flex flex-col gap-5">
-          {assignments.map(({ course }) => {
+          {courses.map((course) => {
             const totalLessons = course.lessons.length;
             const certificateByLearnerId = new Map(course.certificates.map((c) => [c.learnerId, c.id]));
             return (

@@ -72,6 +72,8 @@ export default async function AdminCourseEditPage({
         downloadableWorkbook={course.downloadableWorkbook}
         certificateEnabled={course.certificateEnabled}
         certificatesFlagOn={flags.certificates}
+        externalLinkCoursesFlagOn={flags.external_link_courses}
+        facilitatorAssignmentFlagOn={flags.facilitator_assignment}
         assignedFacilitatorIds={course.facilitators.map((f) => f.facilitatorId)}
         allPrograms={programs.map((p) => p.name)}
         allFacilitators={facilitators.map((f) => ({ id: f.id, name: f.name }))}

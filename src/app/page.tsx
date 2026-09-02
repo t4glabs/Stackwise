@@ -12,7 +12,11 @@ export default async function HomePage() {
   const flags = await getFlags(org.id);
 
   const courses = await prisma.course.findMany({
-    where: { organizationId: org.id, published: true },
+    where: {
+      organizationId: org.id,
+      published: true,
+      ...(flags.external_link_courses ? {} : { type: { not: "EXTERNAL_LINK" } }),
+    },
     include: { program: true },
     orderBy: [{ order: "asc" }, { title: "asc" }],
     take: 3,

@@ -23,6 +23,8 @@ export function CourseConfigForm({
   downloadableWorkbook,
   certificateEnabled,
   certificatesFlagOn,
+  externalLinkCoursesFlagOn,
+  facilitatorAssignmentFlagOn,
   assignedFacilitatorIds,
   allPrograms,
   allFacilitators,
@@ -36,10 +38,18 @@ export function CourseConfigForm({
   downloadableWorkbook: boolean;
   certificateEnabled: boolean;
   certificatesFlagOn: boolean;
+  externalLinkCoursesFlagOn: boolean;
+  facilitatorAssignmentFlagOn: boolean;
   assignedFacilitatorIds: string[];
   allPrograms: string[];
   allFacilitators: { id: string; name: string }[];
 }) {
+  // Keep the current type selectable even if its flag is now off — an admin needs to
+  // be able to see/change away from it, not get stuck with a value the dropdown no
+  // longer offers.
+  const typeOptions = TYPE_OPTIONS.filter(
+    (opt) => opt.value !== "EXTERNAL_LINK" || externalLinkCoursesFlagOn || type === "EXTERNAL_LINK"
+  );
   const [selectedType, setSelectedType] = useState(type);
   const [isPublished, setIsPublished] = useState(published);
   const [isDownloadable, setIsDownloadable] = useState(downloadableWorkbook);
@@ -70,7 +80,7 @@ export function CourseConfigForm({
           onChange={(e) => setSelectedType(e.target.value)}
           className="h-9 rounded-control border border-grey-200 bg-white px-3 text-sm text-ink"
         >
-          {TYPE_OPTIONS.map((opt) => (
+          {typeOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>
@@ -142,29 +152,38 @@ export function CourseConfigForm({
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-2">
-        <Label>Facilitators</Label>
-        {allFacilitators.length === 0 ? (
-          <p className="text-sm text-grey-600">
-            No facilitator accounts yet — add one under People first.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-2 rounded-card border border-grey-200 p-4">
-            {allFacilitators.map((f) => (
-              <label key={f.id} className="flex items-center gap-2 text-sm text-ink">
-                <input
-                  type="checkbox"
-                  name="facilitatorIds"
-                  value={f.id}
-                  defaultChecked={assignedFacilitatorIds.includes(f.id)}
-                  className="size-4 rounded border-grey-400"
-                />
-                {f.name}
-              </label>
-            ))}
-          </div>
-        )}
-      </div>
+      {facilitatorAssignmentFlagOn ? (
+        <div className="flex flex-col gap-2">
+          <Label>Facilitators</Label>
+          {allFacilitators.length === 0 ? (
+            <p className="text-sm text-grey-600">
+              No facilitator accounts yet — add one under People first.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2 rounded-card border border-grey-200 p-4">
+              {allFacilitators.map((f) => (
+                <label key={f.id} className="flex items-center gap-2 text-sm text-ink">
+                  <input
+                    type="checkbox"
+                    name="facilitatorIds"
+                    value={f.id}
+                    defaultChecked={assignedFacilitatorIds.includes(f.id)}
+                    className="size-4 rounded border-grey-400"
+                  />
+                  {f.name}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        // Facilitator assignment is org-wide off (any facilitator manages any course —
+        // see people-permissions.ts) — keep whatever assignments already exist as-is
+        // rather than letting a save on this form silently wipe them.
+        assignedFacilitatorIds.map((id) => (
+          <input key={id} type="hidden" name="facilitatorIds" value={id} />
+        ))
+      )}
 
       {state && !state.ok ? <p className="text-sm text-danger">{state.error}</p> : null}
       {state?.ok && state.tagSyncFailed ? (
