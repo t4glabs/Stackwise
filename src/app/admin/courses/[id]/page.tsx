@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { CourseConfigForm } from "@/components/course-config-form";
 import { EnrollLearnerPanel } from "@/components/enroll-learner-panel";
 import { CertificateCell } from "@/components/certificate-cell";
+import { CohortManager, type CohortSummary } from "@/components/cohort-manager";
 import { ArrowLeft } from "lucide-react";
 
 export default async function AdminCourseEditPage({
@@ -25,11 +26,26 @@ export default async function AdminCourseEditPage({
       facilitators: true,
       enrollments: { include: { learner: true }, orderBy: { enrolledAt: "desc" } },
       certificates: true,
+      cohorts: { include: { facilitator: true }, orderBy: { name: "asc" } },
     },
   });
   if (!course) notFound();
 
   const certificateByLearnerId = new Map(course.certificates.map((c) => [c.learnerId, c.id]));
+
+  const cohortSummaries: CohortSummary[] = course.cohorts.map((cohort) => {
+    const inCohort = course.enrollments.filter((e) => e.cohortId === cohort.id);
+    return {
+      id: cohort.id,
+      name: cohort.name,
+      facilitatorName: cohort.facilitator?.name ?? null,
+      startDate: cohort.startDate?.toISOString() ?? null,
+      endDate: cohort.endDate?.toISOString() ?? null,
+      enrolledCount: inCohort.length,
+      completedCount: inCohort.filter((e) => e.status === "COMPLETED").length,
+    };
+  });
+  const cohortNameById = new Map(course.cohorts.map((c) => [c.id, c.name]));
 
   const [programs, facilitators, flags] = await Promise.all([
     prisma.program.findMany({
@@ -82,11 +98,22 @@ export default async function AdminCourseEditPage({
       <div className="flex flex-col gap-3 border-t border-grey-200 pt-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Eyebrow>Enrolled learners ({course.enrollments.length})</Eyebrow>
-          <EnrollLearnerPanel
-            courseId={course.id}
-            coursePath={coursePath}
-            emailOptional={flags.learner_email_optional}
-          />
+          <div className="flex flex-wrap gap-2">
+            {flags.cohorts ? (
+              <CohortManager
+                courseId={course.id}
+                coursePath={coursePath}
+                cohorts={cohortSummaries}
+                allFacilitators={facilitators.map((f) => ({ id: f.id, name: f.name }))}
+              />
+            ) : null}
+            <EnrollLearnerPanel
+              courseId={course.id}
+              coursePath={coursePath}
+              emailOptional={flags.learner_email_optional}
+              cohorts={flags.cohorts ? cohortSummaries.map((c) => ({ id: c.id, name: c.name })) : []}
+            />
+          </div>
         </div>
 
         {course.enrollments.length === 0 ? (
@@ -99,6 +126,7 @@ export default async function AdminCourseEditPage({
                   <th className="px-5 py-2.5">Learner</th>
                   <th className="px-4 py-2.5">Status</th>
                   <th className="px-4 py-2.5">Source</th>
+                  {flags.cohorts ? <th className="px-4 py-2.5">Cohort</th> : null}
                   {flags.certificates ? <th className="px-4 py-2.5">Certificate</th> : null}
                 </tr>
               </thead>
@@ -116,6 +144,11 @@ export default async function AdminCourseEditPage({
                     <td className="px-4 py-3 text-grey-600">
                       {enrollment.source === "SELF" ? "Self-enrolled" : "Assigned"}
                     </td>
+                    {flags.cohorts ? (
+                      <td className="px-4 py-3 text-grey-600">
+                        {enrollment.cohortId ? (cohortNameById.get(enrollment.cohortId) ?? "—") : "—"}
+                      </td>
+                    ) : null}
                     {flags.certificates ? (
                       <td className="px-4 py-3">
                         <CertificateCell

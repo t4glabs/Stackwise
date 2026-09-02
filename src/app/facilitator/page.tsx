@@ -11,6 +11,7 @@ import { ProgressBar } from "@/components/progress-bar";
 import { ResetPasswordButton } from "@/components/reset-password-button";
 import { EnrollLearnerPanel } from "@/components/enroll-learner-panel";
 import { CertificateCell } from "@/components/certificate-cell";
+import { CohortManager, type CohortSummary } from "@/components/cohort-manager";
 
 export default async function FacilitatorPage() {
   const session = await auth();
@@ -23,20 +24,27 @@ export default async function FacilitatorPage() {
     lessons: true,
     enrollments: { include: { learner: true } },
     certificates: true,
+    cohorts: { include: { facilitator: true }, orderBy: { name: "asc" } },
   } as const;
 
-  const courses = flags.facilitator_assignment
-    ? (
-        await prisma.courseFacilitator.findMany({
-          where: { facilitatorId: session!.user.id },
-          include: { course: { include: courseInclude } },
-        })
-      ).map((a) => a.course)
-    : await prisma.course.findMany({
-        where: { organizationId: session!.user.organizationId, published: true },
-        include: courseInclude,
-        orderBy: { title: "asc" },
-      });
+  const [courses, allFacilitators] = await Promise.all([
+    flags.facilitator_assignment
+      ? prisma.courseFacilitator
+          .findMany({
+            where: { facilitatorId: session!.user.id },
+            include: { course: { include: courseInclude } },
+          })
+          .then((rows) => rows.map((a) => a.course))
+      : prisma.course.findMany({
+          where: { organizationId: session!.user.organizationId, published: true },
+          include: courseInclude,
+          orderBy: { title: "asc" },
+        }),
+    prisma.user.findMany({
+      where: { organizationId: session!.user.organizationId, role: "FACILITATOR" },
+      orderBy: { name: "asc" },
+    }),
+  ]);
 
   return (
     <Container className="flex flex-col gap-8 py-12">
@@ -61,6 +69,19 @@ export default async function FacilitatorPage() {
           {courses.map((course) => {
             const totalLessons = course.lessons.length;
             const certificateByLearnerId = new Map(course.certificates.map((c) => [c.learnerId, c.id]));
+            const cohortSummaries: CohortSummary[] = course.cohorts.map((cohort) => {
+              const inCohort = course.enrollments.filter((e) => e.cohortId === cohort.id);
+              return {
+                id: cohort.id,
+                name: cohort.name,
+                facilitatorName: cohort.facilitator?.name ?? null,
+                startDate: cohort.startDate?.toISOString() ?? null,
+                endDate: cohort.endDate?.toISOString() ?? null,
+                enrolledCount: inCohort.length,
+                completedCount: inCohort.filter((e) => e.status === "COMPLETED").length,
+              };
+            });
+            const cohortNameById = new Map(course.cohorts.map((c) => [c.id, c.name]));
             return (
               <Card key={course.id} className="flex flex-col gap-4 p-0">
                 <div className="flex flex-wrap items-center justify-between gap-3 px-6 pt-6">
@@ -68,11 +89,22 @@ export default async function FacilitatorPage() {
                     <CardTitle>{course.title}</CardTitle>
                     <Badge pill>{course.enrollments.length} enrolled</Badge>
                   </div>
-                  <EnrollLearnerPanel
-                    courseId={course.id}
-                    coursePath="/facilitator"
-                    emailOptional={flags.learner_email_optional}
-                  />
+                  <div className="flex flex-wrap gap-2">
+                    {flags.cohorts ? (
+                      <CohortManager
+                        courseId={course.id}
+                        coursePath="/facilitator"
+                        cohorts={cohortSummaries}
+                        allFacilitators={allFacilitators.map((f) => ({ id: f.id, name: f.name }))}
+                      />
+                    ) : null}
+                    <EnrollLearnerPanel
+                      courseId={course.id}
+                      coursePath="/facilitator"
+                      emailOptional={flags.learner_email_optional}
+                      cohorts={flags.cohorts ? cohortSummaries.map((c) => ({ id: c.id, name: c.name })) : []}
+                    />
+                  </div>
                 </div>
 
                 {course.enrollments.length === 0 ? (
@@ -85,6 +117,7 @@ export default async function FacilitatorPage() {
                           <th className="px-6 py-2.5 font-semibold">Learner</th>
                           <th className="py-2.5 pr-4 font-semibold">Status</th>
                           <th className="py-2.5 pr-4 font-semibold">Progress</th>
+                          {flags.cohorts ? <th className="py-2.5 pr-4 font-semibold">Cohort</th> : null}
                           {flags.certificates ? (
                             <th className="py-2.5 pr-4 font-semibold">Certificate</th>
                           ) : null}
@@ -102,6 +135,8 @@ export default async function FacilitatorPage() {
                             totalLessons={totalLessons}
                             certificatesFlagOn={flags.certificates}
                             certificateId={certificateByLearnerId.get(enrollment.learnerId) ?? null}
+                            cohortsFlagOn={flags.cohorts}
+                            cohortName={enrollment.cohortId ? (cohortNameById.get(enrollment.cohortId) ?? null) : null}
                           />
                         ))}
                       </tbody>
@@ -125,6 +160,8 @@ async function LearnerRow({
   totalLessons,
   certificatesFlagOn,
   certificateId,
+  cohortsFlagOn,
+  cohortName,
 }: {
   learnerName: string;
   learnerId: string;
@@ -133,6 +170,8 @@ async function LearnerRow({
   totalLessons: number;
   certificatesFlagOn: boolean;
   certificateId: string | null;
+  cohortsFlagOn: boolean;
+  cohortName: string | null;
 }) {
   const done = totalLessons
     ? await prisma.progress.count({
@@ -158,6 +197,7 @@ async function LearnerRow({
       <td className="w-48 py-3 pr-4">
         <ProgressBar percent={percent} />
       </td>
+      {cohortsFlagOn ? <td className="py-3 pr-4 text-grey-600">{cohortName ?? "—"}</td> : null}
       {certificatesFlagOn ? (
         <td className="py-3 pr-4">
           <CertificateCell

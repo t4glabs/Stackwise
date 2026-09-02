@@ -66,7 +66,8 @@ export type AssignLearnerState = { ok: true } | { ok: false; error: string } | u
 export async function assignLearnerToCourse(
   learnerId: string,
   courseId: string,
-  coursePath: string
+  coursePath: string,
+  cohortId: string | null
 ): Promise<AssignLearnerState> {
   const session = await auth();
   if (!session?.user) return { ok: false, error: "Not signed in." };
@@ -81,8 +82,10 @@ export async function assignLearnerToCourse(
 
   await prisma.enrollment.upsert({
     where: { learnerId_courseId: { learnerId, courseId } },
-    create: { learnerId, courseId, source: "ASSIGNED", status: "ACTIVE" },
-    update: {},
+    create: { learnerId, courseId, source: "ASSIGNED", status: "ACTIVE", cohortId },
+    // Re-enrolling someone already on the roster shouldn't silently move them to a
+    // different (or no) cohort unless a cohort was actually picked this time.
+    update: cohortId ? { cohortId } : {},
   });
 
   revalidatePath(coursePath);
@@ -108,8 +111,9 @@ export async function createAndEnrollLearner(
   const result = await createUser("LEARNER", formData, emailOptional);
   if (!result || !result.ok) return result ?? { ok: false, error: "Something went wrong." };
 
+  const cohortId = String(formData.get("cohortId") ?? "").trim() || null;
   await prisma.enrollment.create({
-    data: { learnerId: result.id, courseId, source: "ASSIGNED", status: "ACTIVE" },
+    data: { learnerId: result.id, courseId, source: "ASSIGNED", status: "ACTIVE", cohortId },
   });
 
   revalidatePath(coursePath);

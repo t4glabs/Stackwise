@@ -12,14 +12,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Search, UserPlus } from "lucide-react";
 
+export type EnrollableCohort = { id: string; name: string };
+
 export function EnrollLearnerPanel({
   courseId,
   coursePath,
   emailOptional,
+  cohorts = [],
 }: {
   courseId: string;
   coursePath: string;
   emailOptional: boolean;
+  cohorts?: EnrollableCohort[];
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -27,6 +31,9 @@ export function EnrollLearnerPanel({
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searching, startSearch] = useTransition();
   const [showCreate, setShowCreate] = useState(false);
+  // Picked once per panel session — applies whichever way you enroll someone next
+  // (search-and-pick or create-new), rather than asking twice.
+  const [cohortId, setCohortId] = useState("");
 
   function runSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -73,6 +80,27 @@ export function EnrollLearnerPanel({
         </button>
       </div>
 
+      {cohorts.length > 0 ? (
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="enroll-cohort" className="text-xs">
+            Cohort (optional)
+          </Label>
+          <select
+            id="enroll-cohort"
+            value={cohortId}
+            onChange={(e) => setCohortId(e.target.value)}
+            className="h-9 rounded-control border border-grey-200 bg-white px-3 text-sm text-ink"
+          >
+            <option value="">No cohort</option>
+            {cohorts.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
+
       <form onSubmit={runSearch} className="flex items-center gap-2">
         <Input
           value={query}
@@ -96,6 +124,7 @@ export function EnrollLearnerPanel({
                 learner={learner}
                 courseId={courseId}
                 coursePath={coursePath}
+                cohortId={cohortId || null}
                 onEnrolled={() => setResults((r) => r?.filter((l) => l.id !== learner.id) ?? null)}
               />
             ))}
@@ -117,7 +146,12 @@ export function EnrollLearnerPanel({
             Can&apos;t find them — add as a new learner
           </button>
         ) : (
-          <CreateAndEnrollForm courseId={courseId} coursePath={coursePath} emailOptional={emailOptional} />
+          <CreateAndEnrollForm
+            courseId={courseId}
+            coursePath={coursePath}
+            emailOptional={emailOptional}
+            cohortId={cohortId || null}
+          />
         )}
       </div>
     </div>
@@ -128,11 +162,13 @@ function LearnerResultRow({
   learner,
   courseId,
   coursePath,
+  cohortId,
   onEnrolled,
 }: {
   learner: EnrollableLearner;
   courseId: string;
   coursePath: string;
+  cohortId: string | null;
   onEnrolled: () => void;
 }) {
   const [pending, startTransition] = useTransition();
@@ -155,7 +191,7 @@ function LearnerResultRow({
           disabled={pending}
           onClick={() =>
             startTransition(async () => {
-              const result = await assignLearnerToCourse(learner.id, courseId, coursePath);
+              const result = await assignLearnerToCourse(learner.id, courseId, coursePath, cohortId);
               if (result && !result.ok) {
                 setError(result.error);
               } else {
@@ -177,10 +213,12 @@ function CreateAndEnrollForm({
   courseId,
   coursePath,
   emailOptional,
+  cohortId,
 }: {
   courseId: string;
   coursePath: string;
   emailOptional: boolean;
+  cohortId: string | null;
 }) {
   const action = createAndEnrollLearner.bind(null, courseId, coursePath);
   const [state, formAction, pending] = useActionState(action, undefined);
@@ -203,6 +241,7 @@ function CreateAndEnrollForm({
 
   return (
     <form action={formAction} className="flex flex-col gap-2.5">
+      {cohortId ? <input type="hidden" name="cohortId" value={cohortId} /> : null}
       <div className="flex flex-col gap-1">
         <Label htmlFor="new-learner-name" className="text-xs">
           Full name
