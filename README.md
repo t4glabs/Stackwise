@@ -4,7 +4,7 @@
 
 If your organization already keeps its training material, guides, or handbooks in BookStack, Stackwise adds everything a wiki doesn't have: learner accounts, enrollment, progress tracking, roles, and a course catalog — all reading live from the wiki you already maintain.
 
-![Stackwise homepage](docs/screenshots/home.png)
+![Course catalog](docs/screenshots/catalog.png)
 
 ## How it works
 
@@ -25,6 +25,12 @@ Edit a page in BookStack, save it, and the change shows up for learners immediat
 Courses show learners a real syllabus — sessions grouped with their own intro text (pulled from BookStack's own chapter descriptions), not just a flat list of pages.
 
 ![Course syllabus with grouped sessions](docs/screenshots/syllabus.png)
+
+### An admin dashboard that tells you what needs attention
+
+New books from the wiki, learner/facilitator counts, enrollments, completions, and the next things worth doing — at a glance, the moment you log in.
+
+![Admin overview dashboard](docs/screenshots/dashboard.png)
 
 ### Plain-language admin, zero wiki editing required
 
