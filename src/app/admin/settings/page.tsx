@@ -5,6 +5,7 @@ import { Eyebrow } from "@/components/ui/eyebrow";
 import { OrgSettingsForm } from "@/components/org-settings-form";
 import { BrandImageUpload } from "@/components/brand-image-upload";
 import { CustomLinksManager } from "@/components/custom-links-manager";
+import { SyncNowButton } from "@/components/sync-now-button";
 
 export default async function AdminSettingsPage() {
   const session = await auth();
@@ -16,7 +17,18 @@ export default async function AdminSettingsPage() {
 
   return (
     <div className="flex max-w-lg flex-col gap-10">
-      <div>
+      <div className="flex flex-col gap-3">
+        <Eyebrow className="mb-1.5">Content sync</Eyebrow>
+        <SyncNowButton />
+        <p className="text-xs text-grey-500">
+          New and edited books, chapters, and pages sync from your wiki automatically —
+          a webhook picks up changes as they happen, with a cron job as backup every
+          20 minutes (see DEPLOY.md). Use this button to pull the latest content right
+          now instead of waiting, e.g. right after editing the wiki.
+        </p>
+      </div>
+
+      <div className="border-t border-grey-200 pt-8">
         <Eyebrow className="mb-1.5">Branding</Eyebrow>
         <p className="max-w-xl text-sm text-grey-700">
           These are the only NGO-specific words, colors, and links in the whole app —
