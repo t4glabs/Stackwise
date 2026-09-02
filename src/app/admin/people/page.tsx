@@ -34,14 +34,14 @@ export default async function AdminPeoplePage({
   });
 
   return (
-    <div className="flex flex-col gap-6">
-      <nav className="flex w-fit gap-1 rounded-control bg-grey-100 p-1 text-sm font-medium">
+    <div className="flex min-w-0 flex-col gap-6">
+      <nav className="flex w-fit min-w-0 max-w-full gap-1 overflow-x-auto rounded-control bg-grey-100 p-1 text-sm font-medium">
         {TABS.map((t) => (
           <Link
             key={t.key}
             href={`/admin/people?tab=${t.key}`}
             className={cn(
-              "rounded-control px-4 py-1.5 transition-colors",
+              "shrink-0 rounded-control px-4 py-1.5 transition-colors",
               t.key === activeTab.key ? "bg-white text-ink shadow-sm" : "text-grey-600 hover:text-ink"
             )}
           >

@@ -21,7 +21,7 @@ export default async function AdminCoursesPage() {
   });
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex min-w-0 flex-col gap-4">
       <div>
         <Eyebrow className="mb-1.5">{courses.length} from your wiki</Eyebrow>
         <p className="max-w-2xl text-sm text-grey-700">

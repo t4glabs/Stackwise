@@ -89,3 +89,12 @@ body {
   background: var(--color-accent-soft);
   color: var(--color-accent);
 }
+
+/* BookStack page content (lesson bodies) is arbitrary rich-text HTML we don't control —
+   a wide table shouldn't be able to push the whole page into horizontal scroll. Scroll
+   the table itself instead. */
+.prose table {
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+}

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Container } from "@/components/ui/container";
 import { NavLink } from "@/components/nav-link";
+import { MobileMenu } from "@/components/mobile-menu";
 import { ExternalLink } from "lucide-react";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -42,9 +43,39 @@ export async function SiteHeader() {
   // just renders bold on its own.
   const [firstWord, ...rest] = org.brandName.split(" ");
 
+  const customLinkNodes = navLinks.map((link) =>
+    link.openInNewTab ? (
+      <a
+        key={link.id}
+        href={link.url}
+        target="_blank"
+        rel="noreferrer"
+        className="flex items-center gap-1 text-[15px] font-normal text-ink/80 hover:text-ink"
+      >
+        {link.label}
+        <ExternalLink className="size-3" />
+      </a>
+    ) : (
+      <Link key={link.id} href={link.url} className="text-[15px] font-normal text-ink/80 hover:text-ink">
+        {link.label}
+      </Link>
+    )
+  );
+
+  const userBlock = user ? (
+    <div className="flex items-center gap-3">
+      <Badge pill>{ROLE_LABEL[user.role]}</Badge>
+      <span className="text-[14px] text-stone-600">{user.name}</span>
+    </div>
+  ) : (
+    <Link href="/login" className="text-[15px] font-normal text-ink hover:text-stone-600">
+      Log in
+    </Link>
+  );
+
   return (
-    <header className="border-b border-stone-400/70">
-      <Container className="flex h-[77px] items-center justify-between gap-8">
+    <header className="relative border-b border-stone-400/70">
+      <Container className="flex h-[77px] items-center justify-between gap-4">
         <Link href="/" className="flex shrink-0 items-center gap-2.5">
           {org.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- admin-uploaded, unknown-dimension logo
@@ -60,52 +91,40 @@ export async function SiteHeader() {
           </span>
         </Link>
 
-        <nav className="flex flex-1 items-center gap-8">
+        <nav className="hidden flex-1 items-center gap-8 sm:flex">
           <NavLink href="/courses">Courses</NavLink>
           {user ? <NavLink href={ROLE_HOME[user.role]}>My space</NavLink> : null}
-          {navLinks.map((link) =>
-            link.openInNewTab ? (
-              <a
-                key={link.id}
-                href={link.url}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1 text-[15px] font-normal text-ink/80 hover:text-ink"
-              >
-                {link.label}
-                <ExternalLink className="size-3" />
-              </a>
-            ) : (
-              <Link
-                key={link.id}
-                href={link.url}
-                className="text-[15px] font-normal text-ink/80 hover:text-ink"
-              >
-                {link.label}
-              </Link>
-            )
-          )}
+          {customLinkNodes}
         </nav>
 
-        {user ? (
-          <div className="flex shrink-0 items-center gap-3">
-            <span className="hidden items-center gap-2 sm:flex">
-              <Badge pill>{ROLE_LABEL[user.role]}</Badge>
-              <span className="text-[14px] text-stone-600">{user.name}</span>
-            </span>
+        <div className="hidden shrink-0 items-center gap-3 sm:flex">
+          {userBlock}
+          {user ? (
             <form action={signOutAction}>
               <Button variant="ghost" size="sm" type="submit">
                 Log out
               </Button>
             </form>
+          ) : null}
+        </div>
+
+        <MobileMenu>
+          <nav className="flex flex-col gap-3">
+            <NavLink href="/courses">Courses</NavLink>
+            {user ? <NavLink href={ROLE_HOME[user.role]}>My space</NavLink> : null}
+            {customLinkNodes}
+          </nav>
+          <div className="flex flex-col gap-3 border-t border-stone-200 pt-4">
+            {userBlock}
+            {user ? (
+              <form action={signOutAction} className="w-full">
+                <Button variant="ghost" size="sm" type="submit" className="w-full justify-center">
+                  Log out
+                </Button>
+              </form>
+            ) : null}
           </div>
-        ) : (
-          <div className="flex shrink-0 items-center gap-5">
-            <Link href="/login" className="text-[15px] font-normal text-ink hover:text-stone-600">
-              Log in
-            </Link>
-          </div>
-        )}
+        </MobileMenu>
       </Container>
     </header>
   );

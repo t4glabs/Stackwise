@@ -28,7 +28,7 @@ export function BrandImageUpload({
   return (
     <div className="flex flex-col gap-1.5">
       <Label>{label}</Label>
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <div
           className={`flex shrink-0 items-center justify-center overflow-hidden rounded-control border border-grey-200 bg-grey-50 ${previewClassName}`}
         >
@@ -39,13 +39,13 @@ export function BrandImageUpload({
             <span className="text-[11px] text-grey-500">None set</span>
           )}
         </div>
-        <form action={formAction} className="flex items-center gap-2">
+        <form action={formAction} className="flex min-w-0 flex-wrap items-center gap-2">
           <input
             type="file"
             name="file"
             accept="image/png,image/jpeg,image/svg+xml,image/webp,image/x-icon"
             required
-            className="max-w-48 text-xs text-grey-700 file:mr-2 file:rounded-control file:border-0 file:bg-ink file:px-2.5 file:py-1.5 file:text-xs file:font-semibold file:text-white"
+            className="min-w-0 max-w-48 text-xs text-grey-700 file:mr-2 file:rounded-control file:border-0 file:bg-ink file:px-2.5 file:py-1.5 file:text-xs file:font-semibold file:text-white"
           />
           <Button type="submit" size="sm" variant="outline" disabled={pending}>
             {pending ? "Uploading…" : "Upload"}
