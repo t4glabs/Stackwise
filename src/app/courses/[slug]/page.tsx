@@ -197,6 +197,39 @@ function ExternalCourseAction({
   );
 }
 
+type SyllabusLesson = {
+  id: string;
+  title: string;
+  slug: string;
+  bookstackChapterId: number | null;
+  chapterTitle: string | null;
+};
+
+// Consecutive lessons sharing a chapter (sync.ts always emits a chapter's pages
+// together, so a simple run-length grouping is enough — no need to merge
+// non-adjacent runs of the same chapter). Lessons with no chapter render standalone,
+// so a course with no BookStack chapters at all still renders as a flat list.
+type SyllabusBlock =
+  | { type: "lesson"; lesson: SyllabusLesson }
+  | { type: "chapter"; chapterTitle: string; lessons: SyllabusLesson[] };
+
+function groupSyllabus(lessons: SyllabusLesson[]): SyllabusBlock[] {
+  const blocks: SyllabusBlock[] = [];
+  for (const lesson of lessons) {
+    if (lesson.bookstackChapterId == null) {
+      blocks.push({ type: "lesson", lesson });
+      continue;
+    }
+    const last = blocks[blocks.length - 1];
+    if (last?.type === "chapter" && last.lessons[0]?.bookstackChapterId === lesson.bookstackChapterId) {
+      last.lessons.push(lesson);
+    } else {
+      blocks.push({ type: "chapter", chapterTitle: lesson.chapterTitle ?? "Untitled chapter", lessons: [lesson] });
+    }
+  }
+  return blocks;
+}
+
 function SelfOrFacilitatedCourse({
   courseId,
   coursePath,
@@ -213,7 +246,7 @@ function SelfOrFacilitatedCourse({
   loggedIn: boolean;
   enrolled: boolean;
   selfEnrollmentEnabled: boolean;
-  lessons: { id: string; title: string; slug: string }[];
+  lessons: SyllabusLesson[];
   progressByLesson: Map<string, { completedAt: Date | null }>;
   percent: number;
   slug: string;
@@ -247,30 +280,116 @@ function SelfOrFacilitatedCourse({
 
       <div className="flex flex-col gap-4">
         <Eyebrow>Syllabus</Eyebrow>
-        <ol className="flex flex-col divide-y divide-grey-200 overflow-hidden rounded-card border border-grey-200 bg-white">
-          {lessons.map((lesson, i) => {
-            const done = Boolean(progressByLesson.get(lesson.id)?.completedAt);
-            return (
-              <li key={lesson.id}>
-                <Link
-                  href={enrolled ? `/courses/${slug}/lessons/${lesson.slug}` : coursePath}
-                  className="flex items-center gap-4 px-5 py-4 text-[15px] transition-colors hover:bg-grey-50"
-                >
-                  {done ? (
-                    <CheckCircle2 className="size-[18px] shrink-0 text-success" />
-                  ) : (
-                    <Circle className="size-[18px] shrink-0 text-grey-300" />
-                  )}
-                  <span className="font-mono text-[13px] tabular-nums text-grey-400">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <span className="text-ink">{lesson.title}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ol>
+        <SyllabusList
+          lessons={lessons}
+          progressByLesson={progressByLesson}
+          enrolled={enrolled}
+          coursePath={coursePath}
+          slug={slug}
+        />
       </div>
     </div>
+  );
+}
+
+// Renders the 2-level chapter/page structure: a chapter header row (not a link) above
+// its pages, indented slightly to read as a group. Lesson numbering stays continuous
+// across the whole course — it matches the "Lesson N of M" counter on the lesson page
+// itself — chapter grouping is a visual aid layered on top, not a renumbering.
+function SyllabusList({
+  lessons,
+  progressByLesson,
+  enrolled,
+  coursePath,
+  slug,
+}: {
+  lessons: SyllabusLesson[];
+  progressByLesson: Map<string, { completedAt: Date | null }>;
+  enrolled: boolean;
+  coursePath: string;
+  slug: string;
+}) {
+  const blocks = groupSyllabus(lessons);
+  // Lessons already come in global course order, so their position in the flat
+  // array is the same 1-based number shown on the lesson page itself ("Lesson N of
+  // M") — no separate counter to keep in sync during render.
+  const indexById = new Map(lessons.map((lesson, i) => [lesson.id, i + 1]));
+
+  return (
+    <div className="flex flex-col divide-y divide-grey-200 overflow-hidden rounded-card border border-grey-200 bg-white">
+      {blocks.map((block, i) => {
+        if (block.type === "lesson") {
+          return (
+            <SyllabusRow
+              key={block.lesson.id}
+              lesson={block.lesson}
+              index={indexById.get(block.lesson.id)!}
+              done={Boolean(progressByLesson.get(block.lesson.id)?.completedAt)}
+              enrolled={enrolled}
+              coursePath={coursePath}
+              slug={slug}
+            />
+          );
+        }
+        return (
+          <div key={`chapter-${i}`} className="flex flex-col">
+            <p className="bg-grey-50 px-5 py-2.5 text-[13px] font-semibold text-grey-700">
+              {block.chapterTitle}
+            </p>
+            <div className="flex flex-col divide-y divide-grey-200">
+              {block.lessons.map((lesson) => {
+                return (
+                  <SyllabusRow
+                    key={lesson.id}
+                    lesson={lesson}
+                    index={indexById.get(lesson.id)!}
+                    done={Boolean(progressByLesson.get(lesson.id)?.completedAt)}
+                    enrolled={enrolled}
+                    coursePath={coursePath}
+                    slug={slug}
+                    indent
+                  />
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function SyllabusRow({
+  lesson,
+  index,
+  done,
+  enrolled,
+  coursePath,
+  slug,
+  indent,
+}: {
+  lesson: SyllabusLesson;
+  index: number;
+  done: boolean;
+  enrolled: boolean;
+  coursePath: string;
+  slug: string;
+  indent?: boolean;
+}) {
+  return (
+    <Link
+      href={enrolled ? `/courses/${slug}/lessons/${lesson.slug}` : coursePath}
+      className={`flex items-center gap-4 py-4 text-[15px] transition-colors hover:bg-grey-50 ${indent ? "pl-9 pr-5" : "px-5"}`}
+    >
+      {done ? (
+        <CheckCircle2 className="size-[18px] shrink-0 text-success" />
+      ) : (
+        <Circle className="size-[18px] shrink-0 text-grey-300" />
+      )}
+      <span className="font-mono text-[13px] tabular-nums text-grey-400">
+        {String(index).padStart(2, "0")}
+      </span>
+      <span className="text-ink">{lesson.title}</span>
+    </Link>
   );
 }

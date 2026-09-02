@@ -60,7 +60,7 @@ export default async function LessonPage({
 
       <div className="flex flex-col gap-2 border-b border-stone-200 pb-8">
         <span className="font-mono text-[12px] uppercase tracking-[0.1em] text-grey-400">
-          Lesson {lessonIndex + 1} of {course.lessons.length}
+          {lesson.chapterTitle ? `${lesson.chapterTitle} · ` : ""}Lesson {lessonIndex + 1} of {course.lessons.length}
         </span>
         <h1 className="text-[30px] font-semibold leading-tight tracking-tight text-ink">
           {lesson.title}

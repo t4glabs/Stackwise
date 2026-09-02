@@ -53,7 +53,9 @@ export async function GET(
   const sections = await Promise.all(
     lessons.map(async (lesson) => {
       const page = await getPage(lesson.bookstackPageId);
-      return { heading: lesson.title, html: page.html };
+      // Chapter headings are only meaningful in the whole-course doc — a single
+      // chapter's own export is already titled by that chapter's name.
+      return { heading: lesson.title, chapterTitle: chapterParam ? null : lesson.chapterTitle, html: page.html };
     })
   );
 
