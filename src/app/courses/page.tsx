@@ -34,8 +34,7 @@ export default async function CoursesPage() {
         <Eyebrow>Catalog</Eyebrow>
         <h1 className="text-[36px] font-semibold tracking-[-0.01em] text-ink">Courses</h1>
         <p className="max-w-lg font-serif text-[16px] leading-relaxed text-stone-600">
-          Written and maintained in the WeLive wiki — this catalog updates automatically
-          as courses are set up there.
+          Everything available to you, in one place.
         </p>
       </div>
 

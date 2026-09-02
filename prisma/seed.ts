@@ -5,11 +5,11 @@ import { slugify } from "../src/lib/slugify";
 import { bookstackIsConfigured } from "../src/lib/bookstack";
 import { syncCourses } from "../src/lib/sync";
 
-// Demo content mirrors the real books already on https://books.humansofwelive.org so the
-// catalog looks right locally before a real BOOKSTACK_TOKEN_ID/SECRET is added. Once a
-// token is set, re-running this script pulls the real catalog via syncCourses() instead
-// and these placeholders are superseded (same organizationId+slug, so they get updated
-// in place rather than duplicated where slugs happen to match).
+// Placeholder courses so the catalog looks right locally before a real
+// BOOKSTACK_TOKEN_ID/SECRET is added. Once a token is set, re-running this script pulls
+// the real catalog via syncCourses() instead and these placeholders are superseded
+// (same organizationId+slug, so they get updated in place rather than duplicated where
+// slugs happen to match).
 const DEMO_COURSES = [
   {
     program: "Transition Program",
@@ -67,13 +67,13 @@ const DEMO_COURSES = [
 const DEMO_LESSON_TITLES = ["Introduction", "Core Concepts", "Practice Exercise", "Wrap-up & Reflection"];
 
 async function main() {
-  const orgSlug = process.env.ORG_SLUG ?? "welive";
+  const orgSlug = process.env.ORG_SLUG ?? "default";
   const org = await prisma.organization.upsert({
     where: { slug: orgSlug },
     create: {
       slug: orgSlug,
-      name: process.env.ORG_NAME ?? "WeLive Foundation",
-      bookstackBaseUrl: process.env.BOOKSTACK_BASE_URL ?? "https://books.humansofwelive.org",
+      name: process.env.ORG_NAME ?? "Your Organization",
+      bookstackBaseUrl: process.env.BOOKSTACK_BASE_URL ?? "https://wiki.your-org.org",
     },
     update: {},
   });

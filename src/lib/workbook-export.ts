@@ -49,12 +49,13 @@ ${body}
 export async function generateWorkbookDocx(
   title: string,
   sections: ExportSection[],
-  introHtml: string | null = null
+  introHtml: string | null = null,
+  creator: string = "Stackwise"
 ): Promise<Buffer> {
   const html = buildWorkbookHtml(title, sections, introHtml);
   const result = await HtmlToDocx(html, null, {
     title,
-    creator: "WeLive Learning",
+    creator,
     pageNumber: true,
   });
   return Buffer.isBuffer(result) ? result : Buffer.from(result as ArrayBuffer);

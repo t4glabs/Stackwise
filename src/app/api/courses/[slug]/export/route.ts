@@ -66,7 +66,7 @@ export async function GET(
   );
 
   const introHtml = chapterParam ? (lessons[0].chapterDescriptionHtml ?? null) : null;
-  const buffer = await generateWorkbookDocx(docTitle, sections, introHtml);
+  const buffer = await generateWorkbookDocx(docTitle, sections, introHtml, org.brandName);
   const filenameBase = chapterParam ? `${course.slug}-${slugify(docTitle)}` : course.slug;
 
   return new Response(new Uint8Array(buffer), {

@@ -1,8 +1,8 @@
-# Deploying Stackwise to the Hetzner box
+# Deploying Stackwise
 
-This sits next to your existing Ghost and Strapi/Next.js apps in `/var/www`, as its own
-folder, its own pm2 process, and its own Postgres database. Nothing here touches those
-other apps.
+Steps for a plain Ubuntu VPS (e.g. Hetzner) running pm2 + nginx + Postgres — works
+whether it's a dedicated box or one already running other apps, since Stackwise gets
+its own folder, its own pm2 process, and its own Postgres database.
 
 ## 0. One-time server prerequisites
 
@@ -15,7 +15,7 @@ sudo -u postgres psql -c "CREATE USER stackwise WITH ENCRYPTED PASSWORD '<pick-a
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE stackwise TO stackwise;"
 ```
 
-If Strapi already runs a Postgres instance on this box, reuse it — just add a new
+If another app on this box already runs a Postgres instance, reuse it — just add a new
 database + role inside it rather than installing a second Postgres.
 
 Node 20.9+ is required (Next.js 16). Confirm with `node -v`; install/upgrade via nvm if needed.
@@ -42,13 +42,13 @@ cp .env.example .env
 DATABASE_URL="postgresql://stackwise:<password>@localhost:5432/stackwise"
 AUTH_SECRET="$(openssl rand -base64 32)"
 
-BOOKSTACK_BASE_URL="https://books.humansofwelive.org"
+BOOKSTACK_BASE_URL="https://wiki.your-org.org"
 BOOKSTACK_TOKEN_ID="..."       # BookStack > user profile > API Tokens (needs "Access System API")
 BOOKSTACK_TOKEN_SECRET="..."
 BOOKSTACK_WEBHOOK_SECRET="$(openssl rand -hex 16)"
 
-ORG_NAME="WeLive Foundation"
-ORG_SLUG="welive"
+ORG_NAME="Your Organization"
+ORG_SLUG="your-org"
 ```
 
 `chmod 600 .env` — it holds the BookStack token and DB credentials.
@@ -61,7 +61,7 @@ ORG_SLUG="welive"
 2. Tag the books you want published as courses — see the tag taxonomy in the
    architecture plan (`lms_publish=true`, `lms_type=...`, `lms_program=...`, etc.).
 3. Settings > Webhooks > add a webhook pointed at:
-   `https://lms.humansofwelive.org/api/webhooks/bookstack?secret=<BOOKSTACK_WEBHOOK_SECRET>`
+   `https://lms.your-org.org/api/webhooks/bookstack?secret=<BOOKSTACK_WEBHOOK_SECRET>`
    Trigger it on page/chapter/book created/updated/deleted events.
 
 ## 4. Database + first build
@@ -92,12 +92,12 @@ already taken by another app on this box.
 
 ## 6. Nginx + TLS
 
-Create `/etc/nginx/sites-available/lms.humansofwelive.org` (a new file — this does not
-touch your existing Ghost/Strapi server blocks):
+Create `/etc/nginx/sites-available/lms.your-org.org` (a new file — this does not touch
+any other server blocks already on the box):
 
 ```nginx
 server {
-    server_name lms.humansofwelive.org;
+    server_name lms.your-org.org;
 
     location / {
         proxy_pass http://127.0.0.1:3300;
@@ -113,9 +113,9 @@ server {
 ```
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/lms.humansofwelive.org /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/lms.your-org.org /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
-sudo certbot --nginx -d lms.humansofwelive.org
+sudo certbot --nginx -d lms.your-org.org
 ```
 
 ## 7. Sync backstop (cron)
@@ -126,7 +126,7 @@ backstop in case a webhook delivery is ever missed:
 ```bash
 crontab -e
 # every 20 minutes
-*/20 * * * * curl -fsS "https://lms.humansofwelive.org/api/sync?secret=<BOOKSTACK_WEBHOOK_SECRET>" >/dev/null
+*/20 * * * * curl -fsS "https://lms.your-org.org/api/sync?secret=<BOOKSTACK_WEBHOOK_SECRET>" >/dev/null
 ```
 
 ## 8. Backups
