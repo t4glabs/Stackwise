@@ -10,6 +10,7 @@ import { Eyebrow } from "@/components/ui/eyebrow";
 import { ProgressBar } from "@/components/progress-bar";
 import { ResetPasswordButton } from "@/components/reset-password-button";
 import { EnrollLearnerPanel } from "@/components/enroll-learner-panel";
+import { CertificateCell } from "@/components/certificate-cell";
 
 export default async function FacilitatorPage() {
   const session = await auth();
@@ -22,6 +23,7 @@ export default async function FacilitatorPage() {
         include: {
           lessons: true,
           enrollments: { include: { learner: true } },
+          certificates: true,
         },
       },
     },
@@ -48,6 +50,7 @@ export default async function FacilitatorPage() {
         <div className="flex flex-col gap-5">
           {assignments.map(({ course }) => {
             const totalLessons = course.lessons.length;
+            const certificateByLearnerId = new Map(course.certificates.map((c) => [c.learnerId, c.id]));
             return (
               <Card key={course.id} className="flex flex-col gap-4 p-0">
                 <div className="flex flex-wrap items-center justify-between gap-3 px-6 pt-6">
@@ -72,6 +75,9 @@ export default async function FacilitatorPage() {
                           <th className="px-6 py-2.5 font-semibold">Learner</th>
                           <th className="py-2.5 pr-4 font-semibold">Status</th>
                           <th className="py-2.5 pr-4 font-semibold">Progress</th>
+                          {flags.certificates ? (
+                            <th className="py-2.5 pr-4 font-semibold">Certificate</th>
+                          ) : null}
                           <th className="py-2.5 pr-6" />
                         </tr>
                       </thead>
@@ -84,6 +90,8 @@ export default async function FacilitatorPage() {
                             courseId={course.id}
                             status={enrollment.status}
                             totalLessons={totalLessons}
+                            certificatesFlagOn={flags.certificates}
+                            certificateId={certificateByLearnerId.get(enrollment.learnerId) ?? null}
                           />
                         ))}
                       </tbody>
@@ -105,12 +113,16 @@ async function LearnerRow({
   courseId,
   status,
   totalLessons,
+  certificatesFlagOn,
+  certificateId,
 }: {
   learnerName: string;
   learnerId: string;
   courseId: string;
   status: string;
   totalLessons: number;
+  certificatesFlagOn: boolean;
+  certificateId: string | null;
 }) {
   const done = totalLessons
     ? await prisma.progress.count({
@@ -136,6 +148,18 @@ async function LearnerRow({
       <td className="w-48 py-3 pr-4">
         <ProgressBar percent={percent} />
       </td>
+      {certificatesFlagOn ? (
+        <td className="py-3 pr-4">
+          <CertificateCell
+            learnerId={learnerId}
+            courseId={courseId}
+            coursePath="/facilitator"
+            completed={status === "COMPLETED"}
+            certificateId={certificateId}
+            canRevoke={false}
+          />
+        </td>
+      ) : null}
       <td className="py-3 pr-6 text-right">
         <ResetPasswordButton userId={learnerId} />
       </td>

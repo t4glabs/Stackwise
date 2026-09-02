@@ -143,6 +143,13 @@ model Course {
   // Only meaningful for SELF_PACED/FACILITATED courses (there's nothing local to
   // export for EXTERNAL_LINK ones).
   downloadableWorkbook Boolean @default(false)
+  // Off by default, and only meaningful when the org-wide `certificates` feature flag
+  // is also on — the flag is the org's "we use certificates at all" switch, this is
+  // the per-course "...and this particular course awards one" switch. A learner who
+  // reaches 100% completion on a course with both on gets a Certificate row created
+  // automatically (see maybeIssueCertificate in lib/certificates.ts); a facilitator or
+  // admin can also issue one manually regardless of these toggles.
+  certificateEnabled Boolean @default(false)
   lastSyncedAt     DateTime?
 
   lessons      Lesson[]

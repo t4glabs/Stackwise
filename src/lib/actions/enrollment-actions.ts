@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isFeatureEnabled } from "@/lib/flags";
+import { maybeIssueCertificate } from "@/lib/certificates";
 
 async function requireLearner() {
   const session = await auth();
@@ -58,6 +59,7 @@ export async function markCourseComplete(courseId: string, coursePath: string) {
     },
     update: { status: "COMPLETED", completedAt: new Date() },
   });
+  await maybeIssueCertificate(user.id, courseId);
 
   revalidatePath(coursePath);
 }
@@ -75,5 +77,6 @@ async function maybeCompleteCourse(learnerId: string, courseId: string) {
       where: { learnerId_courseId: { learnerId, courseId } },
       data: { status: "COMPLETED", completedAt: new Date() },
     });
+    await maybeIssueCertificate(learnerId, courseId);
   }
 }

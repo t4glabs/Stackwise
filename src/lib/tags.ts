@@ -11,6 +11,7 @@ export type ParsedCourseTags = {
   durationLabel: string | null;
   order: number;
   downloadable: boolean;
+  certificate: boolean;
 };
 
 function findTag(tags: BookStackTag[], name: string): string | null {
@@ -43,6 +44,7 @@ export function parseCourseTags(tags: BookStackTag[]): ParsedCourseTags {
     durationLabel: findTag(tags, "lms_duration"),
     order: orderRaw ? Number.parseInt(orderRaw, 10) || 0 : 0,
     downloadable: findTag(tags, "lms_downloadable")?.toLowerCase() === "true",
+    certificate: findTag(tags, "lms_certificate")?.toLowerCase() === "true",
   };
 }
 
@@ -64,11 +66,13 @@ export function buildLmsTags(course: {
   durationLabel: string | null;
   order: number;
   downloadable: boolean;
+  certificate: boolean;
 }): BookStackTag[] {
   const tags: BookStackTag[] = [
     { name: "lms_publish", value: course.published ? "true" : "false" },
     { name: "lms_type", value: TYPE_TAG_VALUE[course.type] },
     { name: "lms_downloadable", value: course.downloadable ? "true" : "false" },
+    { name: "lms_certificate", value: course.certificate ? "true" : "false" },
   ];
 
   if (course.programName) tags.push({ name: "lms_program", value: course.programName });

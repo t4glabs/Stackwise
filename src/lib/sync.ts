@@ -65,6 +65,7 @@ export async function syncCourses(org: Organization): Promise<SyncResult> {
           order: meta.order,
           published: meta.publish,
           downloadableWorkbook: meta.downloadable,
+          certificateEnabled: meta.certificate,
           lastSyncedAt: new Date(),
         },
       });

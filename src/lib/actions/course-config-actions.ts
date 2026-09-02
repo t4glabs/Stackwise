@@ -37,6 +37,7 @@ export async function saveCourseConfig(
   const externalUrl = String(formData.get("externalUrl") ?? "").trim() || null;
   const facilitatorIds = formData.getAll("facilitatorIds").map(String);
   const downloadableWorkbook = type !== "EXTERNAL_LINK" && formData.get("downloadableWorkbook") === "on";
+  const certificateEnabled = formData.get("certificateEnabled") === "on";
 
   if (type === "EXTERNAL_LINK" && !externalUrl) {
     return { ok: false, error: "An external link course needs a link." };
@@ -63,6 +64,7 @@ export async function saveCourseConfig(
       durationLabel,
       externalUrl: type === "EXTERNAL_LINK" ? externalUrl : null,
       downloadableWorkbook,
+      certificateEnabled,
     },
   });
 
@@ -94,6 +96,7 @@ export async function saveCourseConfig(
           durationLabel,
           order: course.order,
           downloadable: downloadableWorkbook,
+          certificate: certificateEnabled,
         })
       );
     } catch {

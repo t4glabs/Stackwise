@@ -61,6 +61,13 @@ export default async function CourseDetailPage({
   const completedCount = [...progressByLesson.values()].filter((p) => p.completedAt).length;
   const percent = course.lessons.length ? (completedCount / course.lessons.length) * 100 : 0;
 
+  const certificate =
+    session?.user && enrollment?.status === "COMPLETED" && flags.certificates && course.certificateEnabled
+      ? await prisma.certificate.findUnique({
+          where: { learnerId_courseId: { learnerId: session.user.id, courseId: course.id } },
+        })
+      : null;
+
   return (
     <Container className="flex max-w-[720px] flex-col gap-10 py-16">
       <div className="flex flex-col gap-4">
@@ -100,6 +107,20 @@ export default async function CourseDetailPage({
           slug={slug}
         />
       )}
+
+      {certificate ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-accent/20 bg-accent-soft p-6">
+          <div>
+            <Eyebrow className="mb-1.5 text-accent">Completed</Eyebrow>
+            <p className="text-sm text-ink">You&apos;ve earned a certificate for this course.</p>
+          </div>
+          <Button variant="accent" asChild>
+            <Link href={`/certificates/${certificate.id}`} target="_blank">
+              View certificate
+            </Link>
+          </Button>
+        </div>
+      ) : null}
 
       {course.downloadableWorkbook ? (
         <WorkbookDownloads slug={slug} chapters={getWorkbookChapters(course.lessons)} />

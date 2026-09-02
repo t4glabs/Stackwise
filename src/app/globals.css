@@ -116,3 +116,13 @@ body {
 .prose {
   overflow-wrap: anywhere;
 }
+
+/* Printing (used by the certificate view, but applies anywhere) — nobody wants site
+   chrome on a printed page, and .no-print is for the print button itself. */
+@media print {
+  header,
+  footer,
+  .no-print {
+    display: none !important;
+  }
+}

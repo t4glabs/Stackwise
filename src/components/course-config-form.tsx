@@ -21,6 +21,8 @@ export function CourseConfigForm({
   durationLabel,
   externalUrl,
   downloadableWorkbook,
+  certificateEnabled,
+  certificatesFlagOn,
   assignedFacilitatorIds,
   allPrograms,
   allFacilitators,
@@ -32,6 +34,8 @@ export function CourseConfigForm({
   durationLabel: string;
   externalUrl: string;
   downloadableWorkbook: boolean;
+  certificateEnabled: boolean;
+  certificatesFlagOn: boolean;
   assignedFacilitatorIds: string[];
   allPrograms: string[];
   allFacilitators: { id: string; name: string }[];
@@ -39,6 +43,7 @@ export function CourseConfigForm({
   const [selectedType, setSelectedType] = useState(type);
   const [isPublished, setIsPublished] = useState(published);
   const [isDownloadable, setIsDownloadable] = useState(downloadableWorkbook);
+  const [isCertified, setIsCertified] = useState(certificateEnabled);
   const action = saveCourseConfig.bind(null, courseId);
   const [state, formAction, pending] = useActionState(action, undefined);
 
@@ -119,6 +124,21 @@ export function CourseConfigForm({
           </div>
           <input type="hidden" name="downloadableWorkbook" value={isDownloadable ? "on" : "off"} />
           <Switch checked={isDownloadable} onCheckedChange={setIsDownloadable} />
+        </div>
+      ) : null}
+
+      {certificatesFlagOn ? (
+        <div className="flex items-center justify-between rounded-card border border-grey-200 bg-grey-50 px-5 py-4">
+          <div>
+            <p className="text-sm font-semibold text-ink">Award a certificate</p>
+            <p className="text-sm text-grey-600">
+              Learners get a certificate automatically when they complete this course.
+              Certificates are turned on org-wide under Feature flags — this switches
+              them on for this course specifically.
+            </p>
+          </div>
+          <input type="hidden" name="certificateEnabled" value={isCertified ? "on" : "off"} />
+          <Switch checked={isCertified} onCheckedChange={setIsCertified} />
         </div>
       ) : null}
 

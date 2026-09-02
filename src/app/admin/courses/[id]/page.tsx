@@ -7,6 +7,7 @@ import { Eyebrow } from "@/components/ui/eyebrow";
 import { Badge } from "@/components/ui/badge";
 import { CourseConfigForm } from "@/components/course-config-form";
 import { EnrollLearnerPanel } from "@/components/enroll-learner-panel";
+import { CertificateCell } from "@/components/certificate-cell";
 import { ArrowLeft } from "lucide-react";
 
 export default async function AdminCourseEditPage({
@@ -23,9 +24,12 @@ export default async function AdminCourseEditPage({
       program: true,
       facilitators: true,
       enrollments: { include: { learner: true }, orderBy: { enrolledAt: "desc" } },
+      certificates: true,
     },
   });
   if (!course) notFound();
+
+  const certificateByLearnerId = new Map(course.certificates.map((c) => [c.learnerId, c.id]));
 
   const [programs, facilitators, flags] = await Promise.all([
     prisma.program.findMany({
@@ -66,6 +70,8 @@ export default async function AdminCourseEditPage({
         durationLabel={course.durationLabel ?? ""}
         externalUrl={course.externalUrl ?? ""}
         downloadableWorkbook={course.downloadableWorkbook}
+        certificateEnabled={course.certificateEnabled}
+        certificatesFlagOn={flags.certificates}
         assignedFacilitatorIds={course.facilitators.map((f) => f.facilitatorId)}
         allPrograms={programs.map((p) => p.name)}
         allFacilitators={facilitators.map((f) => ({ id: f.id, name: f.name }))}
@@ -91,6 +97,7 @@ export default async function AdminCourseEditPage({
                   <th className="px-5 py-2.5">Learner</th>
                   <th className="px-4 py-2.5">Status</th>
                   <th className="px-4 py-2.5">Source</th>
+                  {flags.certificates ? <th className="px-4 py-2.5">Certificate</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -107,6 +114,18 @@ export default async function AdminCourseEditPage({
                     <td className="px-4 py-3 text-grey-600">
                       {enrollment.source === "SELF" ? "Self-enrolled" : "Assigned"}
                     </td>
+                    {flags.certificates ? (
+                      <td className="px-4 py-3">
+                        <CertificateCell
+                          learnerId={enrollment.learnerId}
+                          courseId={course.id}
+                          coursePath={coursePath}
+                          completed={enrollment.status === "COMPLETED"}
+                          certificateId={certificateByLearnerId.get(enrollment.learnerId) ?? null}
+                          canRevoke
+                        />
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
