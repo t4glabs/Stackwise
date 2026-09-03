@@ -9,6 +9,7 @@ import { CourseConfigForm } from "@/components/course-config-form";
 import { EnrollLearnerPanel } from "@/components/enroll-learner-panel";
 import { CertificateCell } from "@/components/certificate-cell";
 import { CohortManager, type CohortSummary } from "@/components/cohort-manager";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { ArrowLeft } from "lucide-react";
 
 export default async function AdminCourseEditPage({
@@ -126,7 +127,20 @@ export default async function AdminCourseEditPage({
                   <th className="px-5 py-2.5">Learner</th>
                   <th className="px-4 py-2.5">Status</th>
                   <th className="px-4 py-2.5">Source</th>
-                  {flags.cohorts ? <th className="px-4 py-2.5">Cohort</th> : null}
+                  {flags.cohorts ? (
+                    <th className="px-4 py-2.5">
+                      <span className="flex items-center gap-1.5">
+                        Cohort
+                        <InfoTooltip label="What is a cohort?">
+                          <p>
+                            Which batch this learner was enrolled into (e.g. &quot;March 2026
+                            Batch&quot;) — a label for reporting only. It doesn&apos;t restrict
+                            what they can access.
+                          </p>
+                        </InfoTooltip>
+                      </span>
+                    </th>
+                  ) : null}
                   {flags.certificates ? <th className="px-4 py-2.5">Certificate</th> : null}
                 </tr>
               </thead>

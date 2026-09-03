@@ -12,6 +12,7 @@ import { ResetPasswordButton } from "@/components/reset-password-button";
 import { EnrollLearnerPanel } from "@/components/enroll-learner-panel";
 import { CertificateCell } from "@/components/certificate-cell";
 import { CohortManager, type CohortSummary } from "@/components/cohort-manager";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 
 export default async function FacilitatorPage() {
   const session = await auth();
@@ -117,7 +118,21 @@ export default async function FacilitatorPage() {
                           <th className="px-6 py-2.5 font-semibold">Learner</th>
                           <th className="py-2.5 pr-4 font-semibold">Status</th>
                           <th className="py-2.5 pr-4 font-semibold">Progress</th>
-                          {flags.cohorts ? <th className="py-2.5 pr-4 font-semibold">Cohort</th> : null}
+                          {flags.cohorts ? (
+                            <th className="py-2.5 pr-4 font-semibold">
+                              <span className="flex items-center gap-1.5">
+                                Cohort
+                                <InfoTooltip label="What is a cohort?">
+                                  <p>
+                                    Which batch this learner was enrolled into (e.g. &quot;March
+                                    2026 Batch&quot;) — a label for reporting only. It
+                                    doesn&apos;t restrict what they can access or change what you
+                                    can manage.
+                                  </p>
+                                </InfoTooltip>
+                              </span>
+                            </th>
+                          ) : null}
                           {flags.certificates ? (
                             <th className="py-2.5 pr-4 font-semibold">Certificate</th>
                           ) : null}

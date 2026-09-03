@@ -36,7 +36,18 @@ export const FEATURE_FLAGS = {
   },
   cohorts: {
     label: "Cohorts",
-    description: "Batch/cohort grouping for facilitated programs.",
+    description: "Label learners into batches (e.g. \"March 2026\") for reporting — not access control.",
+    // Cohorts are the one concept here every LMS defines differently, so this gets a
+    // fuller explanation wherever it shows up in the UI (see components/ui/info-tooltip
+    // and cohort-manager.tsx) rather than just the one-line description above.
+    example:
+      "Example: your \"Career Guidance\" course gets 40 learners in March and 35 more in June. " +
+      "Without cohorts they're one long list. With cohorts, you create a \"March 2026\" and a " +
+      "\"June 2026\" cohort and assign each learner to one when enrolling them — then you can see " +
+      "progress and completion broken out by batch, e.g. for reporting to a funder.\n\n" +
+      "A cohort is a label only — it doesn't restrict what a learner can see or change who a " +
+      "facilitator can manage. For that, see the \"Facilitator assignment\" module above.\n\n" +
+      "Turning this off just hides cohort UI everywhere; any cohorts you've already created are kept.",
     default: false,
   },
   certificates: {

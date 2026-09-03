@@ -5,6 +5,7 @@ import { createCohortAction, deleteCohortAction } from "@/lib/actions/cohort-act
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { Users, X } from "lucide-react";
 
 export type CohortSummary = {
@@ -50,7 +51,27 @@ export function CohortManager({
   return (
     <div className="flex flex-col gap-3 rounded-card border border-grey-200 bg-grey-50 p-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-ink">Cohorts</p>
+        {/* div, not p — InfoTooltip's popover renders a div, invalid inside a p (see
+            DESIGN_SYSTEM.md's InfoTooltip note) */}
+        <div className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+          Cohorts
+          <InfoTooltip label="What is a cohort?">
+            <p>
+              A cohort is a <strong>label</strong>, not a permission — it groups learners taking
+              this course together (e.g. &quot;March 2026 Batch&quot;) purely for reporting.
+            </p>
+            <p className="mt-2">
+              Example: 40 learners join in March, 35 more in June. Put the March group in a
+              &quot;March 2026&quot; cohort and the June group in &quot;June 2026&quot; when
+              enrolling them, and you can see completion broken out by batch instead of one long
+              list — handy for reporting to a funder or comparing intakes.
+            </p>
+            <p className="mt-2">
+              It does <strong>not</strong> restrict what a learner can see or who a facilitator
+              can manage.
+            </p>
+          </InfoTooltip>
+        </div>
         <button
           type="button"
           onClick={() => {
@@ -65,8 +86,8 @@ export function CohortManager({
 
       {cohorts.length === 0 ? (
         <p className="text-xs text-grey-600">
-          No cohorts yet — a cohort is just a named batch (e.g. &quot;March 2026&quot;) you can
-          put learners into when enrolling them, useful for tracking a group separately.
+          No cohorts yet — add one below to start grouping learners into named batches (e.g.
+          &quot;March 2026 Batch&quot;) for reporting. See the (i) above for a full example.
         </p>
       ) : (
         <ul className="flex flex-col divide-y divide-grey-200 rounded-control border border-grey-200 bg-white">

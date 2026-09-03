@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { Search, UserPlus } from "lucide-react";
 
 export type EnrollableCohort = { id: string; name: string };
@@ -82,9 +83,18 @@ export function EnrollLearnerPanel({
 
       {cohorts.length > 0 ? (
         <div className="flex flex-col gap-1">
-          <Label htmlFor="enroll-cohort" className="text-xs">
-            Cohort (optional)
-          </Label>
+          <div className="flex items-center gap-1.5">
+            <Label htmlFor="enroll-cohort" className="text-xs">
+              Cohort (optional)
+            </Label>
+            <InfoTooltip label="What is a cohort?">
+              <p>
+                A label for which batch this learner is in (e.g. &quot;March 2026 Batch&quot;) —
+                only used for filtering/reporting later. It doesn&apos;t change what they can
+                access, and you can skip it.
+              </p>
+            </InfoTooltip>
+          </div>
           <select
             id="enroll-cohort"
             value={cohortId}

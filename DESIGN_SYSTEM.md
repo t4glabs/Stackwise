@@ -138,6 +138,20 @@ Fonts loaded in `app/layout.tsx` via `next/font/google`:
 - **`Eyebrow`**: the uppercase label component. Use above every card group, stat
   block, and section — it's a signature device across all three reference sites, not
   decoration to skip.
+- **`InfoTooltip`**: a small "(i)" button that reveals a click-to-open panel (no
+  Radix Popover dependency — plain state + click-outside-to-close) for explaining a
+  concept that's genuinely confusing at a glance, not for restating the label. Reserve
+  it for places worth a paragraph and a concrete example — the Cohorts feature (a
+  concept every LMS defines differently) is the reference case: see
+  `cohort-manager.tsx`, the enroll panel's cohort field, the "Cohort" table columns,
+  and the Cohorts row on `/admin/flags`. Put it next to the label as a flex sibling,
+  never nested inside a `<Label>` — a `<label>` forwards clicks to its associated
+  control, so a button nested inside one double-fires. Also never nested inside a
+  `<p>` — its panel renders a `<div>`, and a `<div>` inside a `<p>` is invalid HTML
+  that causes a real hydration mismatch (the browser silently auto-closes the `<p>`
+  early); use a `<div>` wrapper instead, same flex classes. The panel itself resets
+  `normal-case`/`font-normal`/`tracking-normal` since it commonly ends up inside
+  uppercase table headers whose text styling would otherwise cascade into it.
 
 ## When adding a new page
 
