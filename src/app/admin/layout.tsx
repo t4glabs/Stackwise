@@ -1,5 +1,6 @@
 import { Container } from "@/components/ui/container";
 import { AdminNav } from "@/components/admin-nav";
+import { AdminLogsButton } from "@/components/admin-logs-button";
 
 export default function AdminLayout({ children }: LayoutProps<"/admin">) {
   return (
@@ -11,7 +12,10 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
           all live here.
         </p>
       </div>
-      <AdminNav />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <AdminNav />
+        <AdminLogsButton />
+      </div>
       {children}
     </Container>
   );

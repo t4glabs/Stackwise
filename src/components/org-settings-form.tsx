@@ -33,13 +33,13 @@ export function OrgSettingsForm({
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="name">Organization name</Label>
-          <Input id="name" name="name" defaultValue={name} required />
+          <Input id="name" name="name" defaultValue={name} required className="max-w-md" />
           <p className="text-xs text-grey-500">Shown on the course catalog and homepage.</p>
         </div>
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="brandName">LMS brand name</Label>
-          <Input id="brandName" name="brandName" defaultValue={brandName} required />
+          <Input id="brandName" name="brandName" defaultValue={brandName} required className="max-w-md" />
           <p className="text-xs text-grey-500">Shown in the header and browser tab title.</p>
         </div>
       </div>
@@ -75,12 +75,19 @@ export function OrgSettingsForm({
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="heroHeading">Heading</Label>
-          <Input id="heroHeading" name="heroHeading" defaultValue={heroHeading} required />
+          <Input id="heroHeading" name="heroHeading" defaultValue={heroHeading} required className="max-w-md" />
         </div>
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="heroDescription">Description</Label>
-          <Textarea id="heroDescription" name="heroDescription" defaultValue={heroDescription} rows={3} required />
+          <Textarea
+            id="heroDescription"
+            name="heroDescription"
+            defaultValue={heroDescription}
+            rows={3}
+            required
+            className="max-w-md"
+          />
         </div>
       </div>
 
@@ -89,7 +96,7 @@ export function OrgSettingsForm({
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="wikiLinkLabel">Wiki link text</Label>
-          <Input id="wikiLinkLabel" name="wikiLinkLabel" defaultValue={wikiLinkLabel} required />
+          <Input id="wikiLinkLabel" name="wikiLinkLabel" defaultValue={wikiLinkLabel} required className="max-w-md" />
           <p className="text-xs text-grey-500">
             Shown in the footer, e.g. &quot;Content authored in {wikiLinkLabel || "the wiki"}&quot;.
           </p>

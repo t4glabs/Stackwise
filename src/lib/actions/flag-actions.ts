@@ -11,5 +11,5 @@ export async function toggleFlagAction(key: FeatureFlagKey, enabled: boolean) {
   }
 
   await setFlag(session.user.organizationId, key, enabled);
-  revalidatePath("/admin/flags");
+  revalidatePath("/admin/settings");
 }

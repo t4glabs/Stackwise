@@ -58,7 +58,7 @@ export default async function AdminPeoplePage({
       ) : null}
 
       {activeTab.role === "ADMIN" ? (
-        <Card className="flex flex-col gap-4">
+        <Card className="flex max-w-lg flex-col gap-4">
           <div>
             <CardTitle>Add an admin</CardTitle>
             <CardDescription>
@@ -68,7 +68,7 @@ export default async function AdminPeoplePage({
           <AddAdminForm />
         </Card>
       ) : (
-        <Card className="flex flex-col gap-4">
+        <Card className="flex max-w-lg flex-col gap-4">
           <div>
             <CardTitle>Add a {activeTab.role === "LEARNER" ? "learner" : "facilitator"}</CardTitle>
             <CardDescription>
