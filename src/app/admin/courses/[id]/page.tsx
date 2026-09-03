@@ -147,7 +147,14 @@ export default async function AdminCourseEditPage({
               <tbody>
                 {course.enrollments.map((enrollment) => (
                   <tr key={enrollment.id} className="border-b border-grey-200 last:border-0">
-                    <td className="px-5 py-3 text-ink">{enrollment.learner.name}</td>
+                    <td className="px-5 py-3 text-ink">
+                      <span className="flex items-center gap-2">
+                        {enrollment.learner.name}
+                        {enrollment.learner.role !== "LEARNER" ? (
+                          <Badge pill>{enrollment.learner.role === "ADMIN" ? "Admin" : "Facilitator"}</Badge>
+                        ) : null}
+                      </span>
+                    </td>
                     <td className="px-4 py-3">
                       {enrollment.status === "COMPLETED" ? (
                         <Badge variant="success">Completed</Badge>

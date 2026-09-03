@@ -13,6 +13,7 @@ import { EnrollLearnerPanel } from "@/components/enroll-learner-panel";
 import { CertificateCell } from "@/components/certificate-cell";
 import { CohortManager, type CohortSummary } from "@/components/cohort-manager";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
+import type { Role } from "@/generated/prisma/client";
 
 export default async function FacilitatorPage() {
   const session = await auth();
@@ -145,6 +146,7 @@ export default async function FacilitatorPage() {
                             key={enrollment.id}
                             learnerName={enrollment.learner.name}
                             learnerId={enrollment.learnerId}
+                            learnerRole={enrollment.learner.role}
                             courseId={course.id}
                             status={enrollment.status}
                             totalLessons={totalLessons}
@@ -170,6 +172,7 @@ export default async function FacilitatorPage() {
 async function LearnerRow({
   learnerName,
   learnerId,
+  learnerRole,
   courseId,
   status,
   totalLessons,
@@ -180,6 +183,7 @@ async function LearnerRow({
 }: {
   learnerName: string;
   learnerId: string;
+  learnerRole: Role;
   courseId: string;
   status: string;
   totalLessons: number;
@@ -199,9 +203,21 @@ async function LearnerRow({
     : 0;
   const percent = totalLessons ? (done / totalLessons) * 100 : 0;
 
+  // Nothing stops a staff account from also enrolling in a course as a learner (no
+  // role restriction on enrollment) — when that happens, don't offer a reset here:
+  // resetPasswordAction only lets a facilitator reset an actual LEARNER's password,
+  // so the button would always fail. A small badge explains why the row looks
+  // different instead of leaving it a silent mystery.
+  const isActualLearner = learnerRole === "LEARNER";
+
   return (
     <tr className="border-b border-grey-200 last:border-0">
-      <td className="px-6 py-3 text-ink">{learnerName}</td>
+      <td className="px-6 py-3 text-ink">
+        <span className="flex items-center gap-2">
+          {learnerName}
+          {!isActualLearner ? <Badge pill>{learnerRole === "ADMIN" ? "Admin" : "Facilitator"}</Badge> : null}
+        </span>
+      </td>
       <td className="py-3 pr-4">
         {status === "COMPLETED" ? (
           <Badge variant="success">Completed</Badge>
@@ -226,7 +242,7 @@ async function LearnerRow({
         </td>
       ) : null}
       <td className="py-3 pr-6 text-right">
-        <ResetPasswordButton userId={learnerId} />
+        {isActualLearner ? <ResetPasswordButton userId={learnerId} /> : null}
       </td>
     </tr>
   );
