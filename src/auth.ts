@@ -35,6 +35,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const valid = await verifyPassword(password, user.passwordHash);
         if (!valid) return null;
 
+        // Defense in depth — loginAction already checks this with a friendlier
+        // message before ever calling signIn, but this is the actual gate: nothing
+        // reaches a session without it, regardless of which code path calls signIn.
+        if (!user.emailVerifiedAt) return null;
+
         return {
           id: user.id,
           name: user.name,

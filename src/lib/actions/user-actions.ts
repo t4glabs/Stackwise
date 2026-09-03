@@ -7,6 +7,9 @@ import { hashPassword } from "@/lib/password";
 import { generateTempPassword } from "@/lib/temp-password";
 import { generateUniqueUsername } from "@/lib/username";
 import { isFeatureEnabled } from "@/lib/flags";
+import { getPrimaryOrganization } from "@/lib/org";
+import { sendEmail } from "@/lib/email";
+import { credentialsTemplate } from "@/lib/email-templates";
 import { revalidatePath } from "next/cache";
 import type { Role } from "@/generated/prisma/client";
 
@@ -77,8 +80,23 @@ export async function createUser(
       name,
       passwordHash: await hashPassword(tempPassword),
       createdById: session!.user.id,
+      // Staff-created accounts are implicitly trusted — a human already vouches for
+      // this person, unlike the anonymous self-registration path (see registerAction),
+      // which is the only place emailVerifiedAt actually starts out null.
+      emailVerifiedAt: new Date(),
     },
   });
+
+  // Opt-in, staff-facing checkbox — see CreateUserForm. Only meaningful when the
+  // account actually has an email; a username-only account has nowhere to send it.
+  if (email && formData.get("sendCredentialsEmail") === "on") {
+    const org = await getPrimaryOrganization();
+    const { subject, html, text } = credentialsTemplate(org.brandName, name, email, tempPassword);
+    await sendEmail({ to: email, subject, html, text }).catch(() => {
+      // Best-effort: the account is already created and its password is shown
+      // on-screen regardless, so a failed send here shouldn't fail account creation.
+    });
+  }
 
   return { ok: true, id: created.id, identifier: email ?? username, password: tempPassword };
 }

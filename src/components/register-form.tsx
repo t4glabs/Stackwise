@@ -17,8 +17,8 @@ export function RegisterForm() {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="username">Username</Label>
-        <Input id="username" name="username" required />
+        <Label htmlFor="email">Email</Label>
+        <Input id="email" name="email" type="email" autoComplete="email" required />
       </div>
 
       <div className="flex flex-col gap-1.5">

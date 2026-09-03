@@ -66,6 +66,12 @@ export async function SiteHeader() {
     <div className="flex items-center gap-3">
       <Badge pill>{ROLE_LABEL[user.role]}</Badge>
       <span className="text-[14px] text-stone-600">{user.name}</span>
+      <Link
+        href="/account/password"
+        className="text-[13px] font-medium text-accent hover:underline"
+      >
+        Change password
+      </Link>
     </div>
   ) : (
     <Link href="/login" className="text-[15px] font-normal text-ink hover:text-stone-600">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { loginAction } from "@/lib/actions/auth-actions";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,11 +20,25 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="password">Password</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="password">Password</Label>
+          <Link href="/forgot-password" className="text-xs font-medium text-accent hover:underline">
+            Forgot password?
+          </Link>
+        </div>
         <Input id="password" name="password" type="password" autoComplete="current-password" required />
       </div>
 
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      {error ? (
+        <div className="flex flex-col gap-1">
+          <p className="text-sm text-danger">{error}</p>
+          {error.includes("verify") ? (
+            <Link href="/resend-verification" className="text-xs font-medium text-accent hover:underline">
+              Resend the confirmation email
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
 
       <Button variant="accent" type="submit" disabled={pending} className="mt-2 w-full">
         {pending ? "Signing in…" : "Log in"}

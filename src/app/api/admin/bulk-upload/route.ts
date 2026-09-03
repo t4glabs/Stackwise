@@ -36,6 +36,7 @@ export async function POST(request: Request) {
 
   const flags = await getFlags(session.user.organizationId);
   const emailOptional = role === "LEARNER" ? flags.learner_email_optional : flags.facilitator_email_optional;
+  const sendCredentialsEmail = formData.get("sendCredentialsEmail") === "on";
 
   let summary;
   try {
@@ -45,7 +46,8 @@ export async function POST(request: Request) {
       role,
       session.user.organizationId,
       session.user.id,
-      emailOptional
+      emailOptional,
+      sendCredentialsEmail
     );
   } catch {
     backTo.searchParams.set(

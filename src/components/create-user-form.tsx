@@ -50,6 +50,17 @@ export function CreateUserForm({
           </div>
         ) : null}
 
+        {email.trim() ? (
+          <label className="flex items-center gap-2 text-sm text-ink">
+            <input
+              type="checkbox"
+              name="sendCredentialsEmail"
+              className="size-4 rounded border-grey-400"
+            />
+            Email their login details to them
+          </label>
+        ) : null}
+
         {state && !state.ok ? <p className="text-sm text-danger">{state.error}</p> : null}
 
         <Button type="submit" disabled={pending} className="mt-2 self-start">

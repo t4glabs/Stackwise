@@ -3,6 +3,7 @@
 import { signIn, signOut } from "@/auth";
 import { AuthError } from "next-auth";
 import { prisma } from "@/lib/prisma";
+import { verifyPassword } from "@/lib/password";
 
 const ROLE_HOME: Record<string, string> = {
   ADMIN: "/admin",
@@ -17,15 +18,26 @@ export async function loginAction(_prevState: string | undefined, formData: Form
   const password = String(formData.get("password") ?? "");
   const explicitCallbackUrl = String(formData.get("callbackUrl") ?? "").trim();
 
+  const account = await prisma.user.findFirst({
+    where: { OR: [{ email: identifier }, { username: identifier }] },
+  });
+
+  // Check the password before saying anything about verification status — surfacing
+  // "this account isn't verified yet" to someone who doesn't actually know the
+  // password would leak whether an email is registered at all.
+  if (account && !account.emailVerifiedAt) {
+    const passwordOk = await verifyPassword(password, account.passwordHash);
+    if (passwordOk) {
+      return "Please verify your email before logging in — check your inbox for the link we sent when you signed up.";
+    }
+  }
+
   // Only /dashboard (the learner view) was ever used as the post-login destination,
   // which is why an admin logging in used to land on an empty "not enrolled in any
   // courses" screen. Route by the account's actual role unless the visit was
   // specifically redirected here from another page (e.g. hit a protected course URL).
   let redirectTo = explicitCallbackUrl;
   if (!redirectTo || redirectTo === "/dashboard") {
-    const account = await prisma.user.findFirst({
-      where: { OR: [{ email: identifier }, { username: identifier }] },
-    });
     redirectTo = (account && ROLE_HOME[account.role]) || "/dashboard";
   }
 

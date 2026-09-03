@@ -36,17 +36,23 @@ export function BulkUploadPanel({
         method="post"
         action="/api/admin/bulk-upload"
         encType="multipart/form-data"
-        className="flex flex-wrap items-center gap-3 rounded-card border border-grey-200 bg-grey-50 p-4"
+        className="flex flex-col gap-3 rounded-card border border-grey-200 bg-grey-50 p-4"
       >
         <input type="hidden" name="role" value={role} />
-        <input
-          type="file"
-          name="file"
-          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          required
-          className="flex-1 text-sm text-grey-700 file:mr-3 file:rounded-control file:border-0 file:bg-ink file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white"
-        />
-        <Button type="submit">Upload &amp; create accounts</Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            type="file"
+            name="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            required
+            className="flex-1 text-sm text-grey-700 file:mr-3 file:rounded-control file:border-0 file:bg-ink file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white"
+          />
+          <Button type="submit">Upload &amp; create accounts</Button>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-ink">
+          <input type="checkbox" name="sendCredentialsEmail" className="size-4 rounded border-grey-400" />
+          Email each person their login details (only those with an email address)
+        </label>
       </form>
     </div>
   );

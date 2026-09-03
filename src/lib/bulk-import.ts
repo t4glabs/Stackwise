@@ -4,6 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
 import { generateTempPassword } from "@/lib/temp-password";
 import { generateUniqueUsername } from "@/lib/username";
+import { getPrimaryOrganization } from "@/lib/org";
+import { sendEmail } from "@/lib/email";
+import { credentialsTemplate } from "@/lib/email-templates";
 import type { Role } from "@/generated/prisma/client";
 
 const SHEET_NAME = "People" as const;
@@ -91,9 +94,11 @@ export async function importUsersFromWorkbook(
   role: Role,
   organizationId: string,
   createdById: string,
-  emailOptional: boolean
+  emailOptional: boolean,
+  sendCredentialsEmail: boolean = false
 ): Promise<ImportSummary> {
   const rows = readRows(buffer).filter((r) => r.name || r.email || r.username);
+  const org = sendCredentialsEmail ? await getPrimaryOrganization() : null;
 
   const results: ImportRowResult[] = [];
   const seenEmails = new Set<string>();
@@ -161,8 +166,18 @@ export async function importUsersFromWorkbook(
         username,
         passwordHash: await hashPassword(password),
         createdById,
+        // Staff-driven creation is implicitly trusted — see the same note on
+        // createUser in lib/actions/user-actions.ts.
+        emailVerifiedAt: new Date(),
       },
     });
+
+    if (org && email) {
+      const { subject, html, text } = credentialsTemplate(org.brandName, row.name, email, password);
+      // Best-effort per row — one failed send shouldn't abort the rest of the batch,
+      // and the results workbook (with the password) is the fallback either way.
+      await sendEmail({ to: email, subject, html, text }).catch(() => {});
+    }
 
     results.push({ name: row.name, email: email ?? "", username, password, status: "Created" });
   }

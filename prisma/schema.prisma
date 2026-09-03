@@ -84,6 +84,12 @@ model User {
   email        String? @unique
   phone        String?
 
+  // Null until a self-registered account clicks its verification link (see
+  // registerAction / lib/tokens.ts). Staff-created accounts (admin/facilitator "add
+  // learner", bulk import) get this set at creation instead — a human already vouches
+  // for them, so there's nothing to verify. Login is refused while this is null.
+  emailVerifiedAt DateTime?
+
   // Facilitator/admin who created this account — supports youth without personal email.
   createdById String?
 
@@ -94,6 +100,7 @@ model User {
   facilitatingCourses CourseFacilitator[]
   cohortsFacilitated  Cohort[]            @relation("CohortFacilitator")
   certificates        Certificate[]
+  verificationTokens  VerificationToken[]
 
   @@index([organizationId])
 }
@@ -275,4 +282,26 @@ model Certificate {
   issuedAt  DateTime @default(now())
 
   @@unique([learnerId, courseId])
+}
+
+enum TokenPurpose {
+  EMAIL_VERIFY
+  PASSWORD_RESET
+}
+
+// Single-use, short-lived tokens for email verification and password reset. Only the
+// SHA-256 hash of the actual token is ever stored — the raw token lives only in the
+// emailed link, so a database read alone can't be used to redeem an outstanding one.
+// See lib/tokens.ts.
+model VerificationToken {
+  id         String       @id @default(cuid())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id])
+  tokenHash  String       @unique
+  purpose    TokenPurpose
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime     @default(now())
+
+  @@index([userId, purpose])
 }

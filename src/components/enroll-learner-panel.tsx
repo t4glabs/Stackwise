@@ -269,6 +269,12 @@ function CreateAndEnrollForm({
           <Input id="new-learner-username" name="username" placeholder="e.g. first name + initial" required />
         </div>
       ) : null}
+      {email.trim() ? (
+        <label className="flex items-center gap-2 text-xs text-ink">
+          <input type="checkbox" name="sendCredentialsEmail" className="size-3.5 rounded border-grey-400" />
+          Email their login details to them
+        </label>
+      ) : null}
       {state && !state.ok ? <p className="text-xs text-danger">{state.error}</p> : null}
       <Button type="submit" size="sm" disabled={pending} className="self-start">
         {pending ? "Creating…" : "Create & enroll"}
