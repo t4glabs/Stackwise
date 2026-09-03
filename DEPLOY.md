@@ -49,6 +49,15 @@ BOOKSTACK_WEBHOOK_SECRET="$(openssl rand -hex 16)"
 
 ORG_NAME="Your Organization"
 ORG_SLUG="your-org"
+
+# The one real admin account seeding creates — see step 4.
+ADMIN_EMAIL="you@your-org.org"
+ADMIN_NAME="Your Name"
+
+# For account verification, password resets, and the admin setup email below.
+MAILGUN_API_KEY="..."
+MAILGUN_DOMAIN="..."
+MAILGUN_FROM_EMAIL="..."
 ```
 
 `chmod 600 .env` — it holds the BookStack token and DB credentials.
@@ -68,16 +77,23 @@ ORG_SLUG="your-org"
 
 ```bash
 npm run db:deploy   # applies prisma/migrations against Postgres
-npm run db:seed      # creates the org + admin/facilitator/learner accounts
-                      # (pulls the real BookStack catalog automatically, since a
-                      # token is now configured — see prisma/seed.ts)
+npm run db:seed      # creates the org, pulls the real BookStack catalog, and
+                      # creates one admin account at ADMIN_EMAIL (see below)
 npm run build
 ```
 
-**Change the seeded admin/facilitator/learner passwords immediately** — `prisma/seed.ts`
-uses fixed dev passwords (`admin123` etc.) that are fine for local testing but not for
-a real deployment. Either edit them directly in the DB or add a proper "change password"
-flow before rollout.
+Because `BOOKSTACK_TOKEN_ID`/`SECRET` are already set at this point, `db:seed` treats
+this as a real deployment, not a local/demo one: it does **not** create the
+`admin`/`admin123`, `priya`/`facilitator123`, `arjun`/`learner123` demo accounts
+(those only ever exist when no BookStack token is set — i.e. never in a deployment
+that's followed these steps in order). Instead it creates exactly one admin account at
+`ADMIN_EMAIL`, with no password of its own — Mailgun sends them a link to set one and
+log in. If Mailgun isn't configured yet, the setup link is printed to the terminal
+instead; copy it before it scrolls away, or set Mailgun up first and re-run `db:seed`.
+
+Once you're logged in, add any other admins from **Admin → People → Admins** (each
+gets the same emailed setup link) and everyone else — facilitators and learners — from
+**Admin → People**.
 
 ## 5. Start with pm2
 

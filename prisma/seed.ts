@@ -1,9 +1,14 @@
 import "dotenv/config";
+import { randomBytes } from "crypto";
 import { prisma } from "../src/lib/prisma";
 import { hashPassword } from "../src/lib/password";
 import { slugify } from "../src/lib/slugify";
 import { bookstackIsConfigured } from "../src/lib/bookstack";
 import { syncCourses } from "../src/lib/sync";
+import { createToken, appUrl } from "../src/lib/tokens";
+import { sendEmail, emailIsConfigured } from "../src/lib/email";
+import { adminSetupTemplate } from "../src/lib/email-templates";
+import { generateUniqueUsername } from "../src/lib/username";
 
 // Placeholder courses so the catalog looks right locally before a real
 // BOOKSTACK_TOKEN_ID/SECRET is added. Once a token is set, re-running this script pulls
@@ -78,16 +83,25 @@ async function main() {
     update: {},
   });
 
-  const admin = await upsertUser(org.id, "admin", "Admin", "ADMIN", "admin123");
-  const facilitator = await upsertUser(org.id, "priya", "Priya (Facilitator)", "FACILITATOR", "facilitator123");
-  const learner = await upsertUser(org.id, "arjun", "Arjun (Learner)", "LEARNER", "learner123");
-
+  // A configured BookStack connection is what distinguishes "someone is actually
+  // deploying this for real" from "someone is poking at it locally before connecting
+  // real content" (same signal DEPLOY.md's step order already relies on: BookStack is
+  // set up in step 3, seeding happens in step 4). Demo accounts with fixed, publicly
+  // visible passwords (this file is open source) are only ever created in the latter
+  // case — a real deployment gets exactly one real admin, invited by email, and no
+  // demo facilitator/learner accounts at all.
   if (bookstackIsConfigured()) {
-    console.log("BookStack token found — syncing the real catalog instead of demo data...");
+    console.log("BookStack token found — syncing the real catalog (no demo data)...");
     const result = await syncCourses(org);
     console.log(result);
+    await createRealAdmin(org.id, org.name);
   } else {
-    console.log("No BookStack token set — seeding demo placeholder courses (see prisma/seed.ts).");
+    console.log("No BookStack token set — treating this as a local/demo setup.");
+    const admin = await upsertUser(org.id, "admin", "Admin", "ADMIN", "admin123");
+    const facilitator = await upsertUser(org.id, "priya", "Priya (Facilitator)", "FACILITATOR", "facilitator123");
+    const learner = await upsertUser(org.id, "arjun", "Arjun (Learner)", "LEARNER", "learner123");
+
+    console.log("Seeding demo placeholder courses (see prisma/seed.ts)...");
     let bookstackBookId = 9001;
     let bookstackPageId = 90001;
 
@@ -180,12 +194,12 @@ async function main() {
         });
       }
     }
-  }
 
-  console.log("\nSeeded. Demo logins (dev only — change before real use):");
-  console.log(`  admin        / admin123        (${admin.username})`);
-  console.log(`  facilitator  / facilitator123  (${facilitator.username})`);
-  console.log(`  learner      / learner123      (${learner.username})`);
+    console.log("\nSeeded. Demo logins (local/demo only — never created once BookStack is configured):");
+    console.log(`  admin        / admin123        (${admin.username})`);
+    console.log(`  facilitator  / facilitator123  (${facilitator.username})`);
+    console.log(`  learner      / learner123      (${learner.username})`);
+  }
 }
 
 async function upsertUser(
@@ -203,9 +217,64 @@ async function upsertUser(
       name,
       role,
       passwordHash: await hashPassword(password),
+      // Local/demo accounts only reach this branch (see the comment above the
+      // bookstackIsConfigured() check) — implicitly trusted, same as any other
+      // staff-created account, so the email-verification gate in auth.ts doesn't
+      // block them from logging in.
+      emailVerifiedAt: new Date(),
     },
     update: {},
   });
+}
+
+// Real deployments get exactly one admin, created here and invited by email — never
+// a fixed/guessable password. Requires ADMIN_EMAIL so there's no way to end up with a
+// silently-unusable or silently-insecure admin account; DEPLOY.md documents this.
+async function createRealAdmin(organizationId: string, orgName: string) {
+  const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  if (!email) {
+    throw new Error(
+      "BookStack is configured (this looks like a real deployment) but ADMIN_EMAIL is not set. " +
+        "Add ADMIN_EMAIL (and optionally ADMIN_NAME) to .env and re-run `npm run db:seed` — see DEPLOY.md."
+    );
+  }
+
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    console.log(`Admin ${email} already exists — skipping (re-run doesn't re-invite an existing admin).`);
+    return existing;
+  }
+
+  const name = process.env.ADMIN_NAME?.trim() || "Admin";
+  const username = await generateUniqueUsername(email);
+
+  const admin = await prisma.user.create({
+    data: {
+      organizationId,
+      role: "ADMIN",
+      username,
+      name,
+      email,
+      // Nobody knows this — the account is unusable until the setup link below is
+      // used, so there's never a default admin password to leave unrotated.
+      passwordHash: await hashPassword(randomBytes(32).toString("hex")),
+      emailVerifiedAt: new Date(),
+    },
+  });
+
+  const token = await createToken(admin.id, "PASSWORD_RESET");
+  const link = appUrl(`/reset-password?token=${token}`);
+  const { subject, html, text } = adminSetupTemplate(orgName, name, link);
+  await sendEmail({ to: email, subject, html, text, context: { organizationId, purpose: "Admin setup", userId: admin.id } });
+
+  console.log(`\nAdmin account created for ${email}.`);
+  console.log(
+    emailIsConfigured()
+      ? "A setup email was sent — they should check their inbox to set a password and log in."
+      : "Mailgun isn't configured, so the setup link was printed above instead of emailed — copy it to finish setup."
+  );
+
+  return admin;
 }
 
 main()

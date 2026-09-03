@@ -1,15 +1,18 @@
 "use server";
 
+import { randomBytes } from "crypto";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { hashPassword } from "@/lib/password";
+import { hashPassword, verifyPassword } from "@/lib/password";
 import { generateTempPassword } from "@/lib/temp-password";
 import { generateUniqueUsername } from "@/lib/username";
 import { isFeatureEnabled } from "@/lib/flags";
 import { getPrimaryOrganization } from "@/lib/org";
 import { sendEmail } from "@/lib/email";
-import { credentialsTemplate } from "@/lib/email-templates";
+import { credentialsTemplate, adminSetupTemplate } from "@/lib/email-templates";
+import { createToken, appUrl } from "@/lib/tokens";
+import { logEvent } from "@/lib/log";
 import { revalidatePath } from "next/cache";
 import type { Role } from "@/generated/prisma/client";
 
@@ -136,6 +139,97 @@ export async function createFacilitatorAction(
   const result = await createUser("FACILITATOR", formData, emailOptional);
   revalidatePath("/admin/people");
   return result;
+}
+
+export type CreateAdminState = { ok: true; email: string } | { ok: false; error: string } | undefined;
+
+// Admins are the highest-trust role, so this path is deliberately different from
+// createUser: email is always required (no username-only admins), no temp password is
+// ever shown on screen — the new admin gets an emailed setup link instead (see
+// prisma/seed.ts, which creates the first admin the same way) — and creating one
+// requires the acting admin to re-enter their own password, a step-up check against
+// this specific action rather than just relying on the session already being ADMIN.
+export async function createAdminAction(
+  _prevState: CreateAdminState,
+  formData: FormData
+): Promise<CreateAdminState> {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "ADMIN") {
+    return { ok: false, error: "Only admins can add other admins." };
+  }
+
+  const nameResult = nameSchema.safeParse(formData.get("name"));
+  if (!nameResult.success) {
+    return { ok: false, error: nameResult.error.issues[0]?.message ?? "Invalid name." };
+  }
+
+  const emailResult = emailSchema.safeParse(String(formData.get("email") ?? "").trim().toLowerCase());
+  if (!emailResult.success) {
+    return { ok: false, error: emailResult.error.issues[0]?.message ?? "Invalid email." };
+  }
+
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
+  if (!confirmPassword) {
+    return { ok: false, error: "Enter your own password to confirm." };
+  }
+
+  const actingAdmin = await prisma.user.findUnique({ where: { id: session.user.id } });
+  if (!actingAdmin) return { ok: false, error: "Account not found." };
+
+  const passwordOk = await verifyPassword(confirmPassword, actingAdmin.passwordHash);
+  if (!passwordOk) {
+    await logEvent({
+      organizationId: session.user.organizationId,
+      type: "LOGIN",
+      level: "ERROR",
+      message: `Add-admin attempt by ${actingAdmin.email ?? actingAdmin.username} failed: incorrect confirmation password`,
+      userId: actingAdmin.id,
+    });
+    return { ok: false, error: "That's not your current password." };
+  }
+
+  const existing = await prisma.user.findUnique({ where: { email: emailResult.data } });
+  if (existing) return { ok: false, error: "That email is already in use." };
+
+  const org = await getPrimaryOrganization();
+  const username = await generateUniqueUsername(emailResult.data);
+
+  const newAdmin = await prisma.user.create({
+    data: {
+      organizationId: session.user.organizationId,
+      role: "ADMIN",
+      username,
+      name: nameResult.data,
+      email: emailResult.data,
+      // Nobody knows this — same reasoning as prisma/seed.ts's createRealAdmin.
+      passwordHash: await hashPassword(randomBytes(32).toString("hex")),
+      createdById: session.user.id,
+      emailVerifiedAt: new Date(),
+    },
+  });
+
+  const token = await createToken(newAdmin.id, "PASSWORD_RESET");
+  const link = appUrl(`/reset-password?token=${token}`);
+  const { subject, html, text } = adminSetupTemplate(org.brandName, nameResult.data, link);
+  await sendEmail({
+    to: emailResult.data,
+    subject,
+    html,
+    text,
+    context: { organizationId: org.id, purpose: "Admin setup", userId: newAdmin.id },
+  });
+
+  await logEvent({
+    organizationId: org.id,
+    type: "REGISTER",
+    level: "INFO",
+    message: `New admin added by ${actingAdmin.email ?? actingAdmin.username}: ${emailResult.data}`,
+    userId: newAdmin.id,
+    email: emailResult.data,
+  });
+
+  revalidatePath("/admin/people");
+  return { ok: true, email: emailResult.data };
 }
 
 export type ResetPasswordState =

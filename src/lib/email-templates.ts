@@ -43,6 +43,22 @@ export function passwordResetTemplate(orgName: string, name: string, link: strin
   };
 }
 
+// For new admin accounts (seeded at deploy time, or added by another admin) — no
+// temp password is ever generated for this role; the account is unusable until this
+// link is used. See lib/tokens.ts (reuses PASSWORD_RESET — functionally identical:
+// prove email ownership, then set a password) and prisma/seed.ts.
+export function adminSetupTemplate(orgName: string, name: string, link: string) {
+  return {
+    subject: `Set up your admin account for ${orgName}`,
+    ...wrap(orgName, [
+      `Hi ${name},`,
+      `You've been given admin access to ${orgName}. Click the link below to set your password and log in:`,
+      `<a href="${link}">${link}</a>`,
+      `This link expires in 1 hour — if it's expired, use "Forgot password" on the login page to get a new one.`,
+    ]),
+  };
+}
+
 export function credentialsTemplate(orgName: string, name: string, identifier: string, password: string) {
   return {
     subject: `Your ${orgName} login details`,

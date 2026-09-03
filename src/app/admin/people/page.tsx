@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { AddPersonPanel } from "@/components/add-person-panel";
+import { AddAdminForm } from "@/components/add-admin-form";
 import { ResetPasswordButton } from "@/components/reset-password-button";
 import { createFacilitatorAction, createLearnerAction } from "@/lib/actions/user-actions";
 import { cn } from "@/lib/utils";
@@ -56,7 +57,17 @@ export default async function AdminPeoplePage({
         </div>
       ) : null}
 
-      {activeTab.role !== "ADMIN" ? (
+      {activeTab.role === "ADMIN" ? (
+        <Card className="flex flex-col gap-4">
+          <div>
+            <CardTitle>Add an admin</CardTitle>
+            <CardDescription>
+              Full access to people, courses, and settings — add these sparingly.
+            </CardDescription>
+          </div>
+          <AddAdminForm />
+        </Card>
+      ) : (
         <Card className="flex flex-col gap-4">
           <div>
             <CardTitle>Add a {activeTab.role === "LEARNER" ? "learner" : "facilitator"}</CardTitle>
@@ -82,7 +93,7 @@ export default async function AdminPeoplePage({
             />
           )}
         </Card>
-      ) : null}
+      )}
 
       <div className="flex flex-col gap-3">
         <Eyebrow>
