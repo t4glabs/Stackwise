@@ -167,6 +167,14 @@ Fonts loaded in `app/layout.tsx` via `next/font/google`:
   banner/tooltip chrome is suppressed in `globals.css`. If the language list changes,
   it's just the `LANGUAGES` array in `language-switcher.tsx` — codes are Google
   Translate's own ISO codes.
+- **`/admin/cohorts`**: org-wide rollup of every cohort across every course — status
+  (derived from dates, not stored), facilitator, enrolled/completed, a `ProgressBar`.
+  Per-course cohort management (`cohort-manager.tsx`) already existed; this is the
+  answer to "how's the March batch doing" without opening every course one at a time.
+  Follows the same flag-gating every other optional module does: hidden from `AdminNav`
+  when `flags.cohorts` is off (which is why `admin/layout.tsx` fetches flags and passes
+  `cohortsEnabled` down — it used to be a static tab list) and the page itself
+  `notFound()`s if hit directly, same as the certificate page's permission check.
 
 ## When adding a new page
 

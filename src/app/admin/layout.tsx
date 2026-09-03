@@ -1,8 +1,13 @@
+import { auth } from "@/auth";
+import { getFlags } from "@/lib/flags";
 import { Container } from "@/components/ui/container";
 import { AdminNav } from "@/components/admin-nav";
 import { AdminLogsButton } from "@/components/admin-logs-button";
 
-export default function AdminLayout({ children }: LayoutProps<"/admin">) {
+export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
+  const session = await auth();
+  const flags = await getFlags(session!.user.organizationId);
+
   return (
     <Container className="flex flex-col gap-8 py-12">
       <div>
@@ -13,7 +18,7 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
         </p>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <AdminNav />
+        <AdminNav cohortsEnabled={flags.cohorts} />
         <AdminLogsButton />
       </div>
       {children}

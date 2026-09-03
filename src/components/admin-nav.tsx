@@ -4,21 +4,28 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-const TABS = [
+const BASE_TABS = [
   { href: "/admin", label: "Overview" },
   { href: "/admin/courses", label: "Courses" },
   { href: "/admin/people", label: "People" },
-  { href: "/admin/settings", label: "Settings" },
 ];
+
+const COHORTS_TAB = { href: "/admin/cohorts", label: "Cohorts" };
+
+const SETTINGS_TAB = { href: "/admin/settings", label: "Settings" };
 
 // Segmented control — the dashboard-mode nav pattern (grey-100 track, white active
 // pill) rather than underline tabs, matching the compact/dense admin surfaces.
-export function AdminNav() {
+export function AdminNav({ cohortsEnabled }: { cohortsEnabled: boolean }) {
   const pathname = usePathname();
+  // Same "hidden from the nav, route refuses the request" rule every other flag
+  // follows (see lib/flags.ts) — the /admin/cohorts page itself also 404s when this
+  // flag is off, so this isn't the only thing enforcing it, just keeping the nav honest.
+  const tabs = cohortsEnabled ? [...BASE_TABS, COHORTS_TAB, SETTINGS_TAB] : [...BASE_TABS, SETTINGS_TAB];
 
   return (
     <nav className="flex w-fit min-w-0 max-w-full gap-1 overflow-x-auto rounded-control bg-grey-100 p-1 text-sm font-medium">
-      {TABS.map((tab) => {
+      {tabs.map((tab) => {
         const active = tab.href === "/admin" ? pathname === "/admin" : pathname.startsWith(tab.href);
         return (
           <Link
