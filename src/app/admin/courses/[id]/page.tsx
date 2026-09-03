@@ -25,30 +25,42 @@ export default async function AdminCourseEditPage({
     include: {
       program: true,
       facilitators: true,
-      enrollments: { include: { learner: true }, orderBy: { enrolledAt: "desc" } },
+      enrollments: {
+        include: { learner: true, cohort: { include: { facilitator: true } } },
+        orderBy: { enrolledAt: "desc" },
+      },
       certificates: true,
-      cohorts: { include: { facilitator: true }, orderBy: { name: "asc" } },
     },
   });
   if (!course) notFound();
 
   const certificateByLearnerId = new Map(course.certificates.map((c) => [c.learnerId, c.id]));
 
-  const cohortSummaries: CohortSummary[] = course.cohorts.map((cohort) => {
-    const inCohort = course.enrollments.filter((e) => e.cohortId === cohort.id);
-    return {
-      id: cohort.id,
-      name: cohort.name,
-      facilitatorName: cohort.facilitator?.name ?? null,
-      startDate: cohort.startDate?.toISOString() ?? null,
-      endDate: cohort.endDate?.toISOString() ?? null,
-      enrolledCount: inCohort.length,
-      completedCount: inCohort.filter((e) => e.status === "COMPLETED").length,
-    };
-  });
-  const cohortNameById = new Map(course.cohorts.map((c) => [c.id, c.name]));
+  // Cohorts aren't owned by a course anymore (see schema.prisma) — this panel manages
+  // whichever cohorts happen to have an enrollment in *this* course, derived straight
+  // from the enrollments rather than a course.cohorts relation that no longer exists.
+  const cohortSummaryById = new Map<string, CohortSummary>();
+  for (const enrollment of course.enrollments) {
+    if (!enrollment.cohort) continue;
+    const existing = cohortSummaryById.get(enrollment.cohort.id);
+    if (existing) {
+      existing.enrolledCount += 1;
+      if (enrollment.status === "COMPLETED") existing.completedCount += 1;
+    } else {
+      cohortSummaryById.set(enrollment.cohort.id, {
+        id: enrollment.cohort.id,
+        name: enrollment.cohort.name,
+        facilitatorName: enrollment.cohort.facilitator?.name ?? null,
+        startDate: enrollment.cohort.startDate?.toISOString() ?? null,
+        endDate: enrollment.cohort.endDate?.toISOString() ?? null,
+        enrolledCount: 1,
+        completedCount: enrollment.status === "COMPLETED" ? 1 : 0,
+      });
+    }
+  }
+  const cohortSummaries = Array.from(cohortSummaryById.values()).sort((a, b) => a.name.localeCompare(b.name));
 
-  const [programs, facilitators, flags] = await Promise.all([
+  const [programs, facilitators, allCohorts, flags] = await Promise.all([
     prisma.program.findMany({
       where: { organizationId: session!.user.organizationId },
       orderBy: { name: "asc" },
@@ -56,6 +68,13 @@ export default async function AdminCourseEditPage({
     prisma.user.findMany({
       where: { organizationId: session!.user.organizationId, role: "FACILITATOR" },
       orderBy: { name: "asc" },
+    }),
+    // Org-wide, not scoped to this course — the "reuse an existing cohort" list, and
+    // what the enroll panel's cohort dropdown offers regardless of which course.
+    prisma.cohort.findMany({
+      where: { organizationId: session!.user.organizationId },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
     }),
     getFlags(session!.user.organizationId),
   ]);
@@ -102,17 +121,18 @@ export default async function AdminCourseEditPage({
           <div className="flex flex-wrap gap-2">
             {flags.cohorts ? (
               <CohortManager
-                courseId={course.id}
                 coursePath={coursePath}
                 cohorts={cohortSummaries}
+                allCohorts={allCohorts}
                 allFacilitators={facilitators.map((f) => ({ id: f.id, name: f.name }))}
+                isAdmin={session!.user.role === "ADMIN"}
               />
             ) : null}
             <EnrollLearnerPanel
               courseId={course.id}
               coursePath={coursePath}
               emailOptional={flags.learner_email_optional}
-              cohorts={flags.cohorts ? cohortSummaries.map((c) => ({ id: c.id, name: c.name })) : []}
+              cohorts={flags.cohorts ? allCohorts : []}
             />
           </div>
         </div>
@@ -166,9 +186,7 @@ export default async function AdminCourseEditPage({
                       {enrollment.source === "SELF" ? "Self-enrolled" : "Assigned"}
                     </td>
                     {flags.cohorts ? (
-                      <td className="px-4 py-3 text-grey-600">
-                        {enrollment.cohortId ? (cohortNameById.get(enrollment.cohortId) ?? "—") : "—"}
-                      </td>
+                      <td className="px-4 py-3 text-grey-600">{enrollment.cohort?.name ?? "—"}</td>
                     ) : null}
                     {flags.certificates ? (
                       <td className="px-4 py-3">

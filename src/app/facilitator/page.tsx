@@ -24,12 +24,11 @@ export default async function FacilitatorPage() {
   // explicitly assigned them to (matches canManageCourseRoster in people-permissions.ts).
   const courseInclude = {
     lessons: true,
-    enrollments: { include: { learner: true } },
+    enrollments: { include: { learner: true, cohort: { include: { facilitator: true } } } },
     certificates: true,
-    cohorts: { include: { facilitator: true }, orderBy: { name: "asc" } },
   } as const;
 
-  const [courses, allFacilitators] = await Promise.all([
+  const [courses, allFacilitators, allCohorts] = await Promise.all([
     flags.facilitator_assignment
       ? prisma.courseFacilitator
           .findMany({
@@ -46,7 +45,14 @@ export default async function FacilitatorPage() {
       where: { organizationId: session!.user.organizationId, role: "FACILITATOR" },
       orderBy: { name: "asc" },
     }),
+    // Org-wide, not scoped to any one course — see the note on the admin course page.
+    prisma.cohort.findMany({
+      where: { organizationId: session!.user.organizationId },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
   ]);
+  const isAdmin = session!.user.role === "ADMIN";
 
   return (
     <Container className="flex flex-col gap-8 py-12">
@@ -71,19 +77,31 @@ export default async function FacilitatorPage() {
           {courses.map((course) => {
             const totalLessons = course.lessons.length;
             const certificateByLearnerId = new Map(course.certificates.map((c) => [c.learnerId, c.id]));
-            const cohortSummaries: CohortSummary[] = course.cohorts.map((cohort) => {
-              const inCohort = course.enrollments.filter((e) => e.cohortId === cohort.id);
-              return {
-                id: cohort.id,
-                name: cohort.name,
-                facilitatorName: cohort.facilitator?.name ?? null,
-                startDate: cohort.startDate?.toISOString() ?? null,
-                endDate: cohort.endDate?.toISOString() ?? null,
-                enrolledCount: inCohort.length,
-                completedCount: inCohort.filter((e) => e.status === "COMPLETED").length,
-              };
-            });
-            const cohortNameById = new Map(course.cohorts.map((c) => [c.id, c.name]));
+            // Cohorts aren't owned by a course anymore — this is whichever cohorts
+            // happen to have an enrollment in *this* course, derived from the
+            // enrollments themselves (see the same pattern on the admin course page).
+            const cohortSummaryById = new Map<string, CohortSummary>();
+            for (const enrollment of course.enrollments) {
+              if (!enrollment.cohort) continue;
+              const existing = cohortSummaryById.get(enrollment.cohort.id);
+              if (existing) {
+                existing.enrolledCount += 1;
+                if (enrollment.status === "COMPLETED") existing.completedCount += 1;
+              } else {
+                cohortSummaryById.set(enrollment.cohort.id, {
+                  id: enrollment.cohort.id,
+                  name: enrollment.cohort.name,
+                  facilitatorName: enrollment.cohort.facilitator?.name ?? null,
+                  startDate: enrollment.cohort.startDate?.toISOString() ?? null,
+                  endDate: enrollment.cohort.endDate?.toISOString() ?? null,
+                  enrolledCount: 1,
+                  completedCount: enrollment.status === "COMPLETED" ? 1 : 0,
+                });
+              }
+            }
+            const cohortSummaries = Array.from(cohortSummaryById.values()).sort((a, b) =>
+              a.name.localeCompare(b.name)
+            );
             return (
               <Card key={course.id} className="flex flex-col gap-4 p-0">
                 <div className="flex flex-wrap items-center justify-between gap-3 px-6 pt-6">
@@ -94,17 +112,18 @@ export default async function FacilitatorPage() {
                   <div className="flex flex-wrap gap-2">
                     {flags.cohorts ? (
                       <CohortManager
-                        courseId={course.id}
                         coursePath="/facilitator"
                         cohorts={cohortSummaries}
+                        allCohorts={allCohorts}
                         allFacilitators={allFacilitators.map((f) => ({ id: f.id, name: f.name }))}
+                        isAdmin={isAdmin}
                       />
                     ) : null}
                     <EnrollLearnerPanel
                       courseId={course.id}
                       coursePath="/facilitator"
                       emailOptional={flags.learner_email_optional}
-                      cohorts={flags.cohorts ? cohortSummaries.map((c) => ({ id: c.id, name: c.name })) : []}
+                      cohorts={flags.cohorts ? allCohorts : []}
                     />
                   </div>
                 </div>
@@ -153,7 +172,7 @@ export default async function FacilitatorPage() {
                             certificatesFlagOn={flags.certificates}
                             certificateId={certificateByLearnerId.get(enrollment.learnerId) ?? null}
                             cohortsFlagOn={flags.cohorts}
-                            cohortName={enrollment.cohortId ? (cohortNameById.get(enrollment.cohortId) ?? null) : null}
+                            cohortName={enrollment.cohort?.name ?? null}
                           />
                         ))}
                       </tbody>

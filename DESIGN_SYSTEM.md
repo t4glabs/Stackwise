@@ -144,7 +144,7 @@ Fonts loaded in `app/layout.tsx` via `next/font/google`:
   it for places worth a paragraph and a concrete example — the Cohorts feature (a
   concept every LMS defines differently) is the reference case: see
   `cohort-manager.tsx`, the enroll panel's cohort field, the "Cohort" table columns,
-  and the Cohorts row on `/admin/flags`. Put it next to the label as a flex sibling,
+  and the Cohorts row on `/admin/settings`. Put it next to the label as a flex sibling,
   never nested inside a `<Label>` — a `<label>` forwards clicks to its associated
   control, so a button nested inside one double-fires. Also never nested inside a
   `<p>` — its panel renders a `<div>`, and a `<div>` inside a `<p>` is invalid HTML
@@ -167,14 +167,32 @@ Fonts loaded in `app/layout.tsx` via `next/font/google`:
   banner/tooltip chrome is suppressed in `globals.css`. If the language list changes,
   it's just the `LANGUAGES` array in `language-switcher.tsx` — codes are Google
   Translate's own ISO codes.
-- **`/admin/cohorts`**: org-wide rollup of every cohort across every course — status
-  (derived from dates, not stored), facilitator, enrolled/completed, a `ProgressBar`.
-  Per-course cohort management (`cohort-manager.tsx`) already existed; this is the
-  answer to "how's the March batch doing" without opening every course one at a time.
-  Follows the same flag-gating every other optional module does: hidden from `AdminNav`
-  when `flags.cohorts` is off (which is why `admin/layout.tsx` fetches flags and passes
-  `cohortsEnabled` down — it used to be a static tab list) and the page itself
-  `notFound()`s if hit directly, same as the certificate page's permission check.
+- **Cohorts are org-wide, not per-course** (`Cohort.organizationId`, unique on
+  `[organizationId, name]` — see schema.prisma). They started out belonging to a
+  single course; that was a real limitation once a program spans several courses and
+  a batch needs to be the same cohort across all of them, so it changed. A cohort's
+  relationship to a course is now *entirely derived* from its `Enrollment` rows (join
+  through `Enrollment.cohortId → cohortId`) — there's no `Course.cohorts` relation to
+  reach for. **Creating a cohort is an upsert keyed on name** (`createCohortAction` in
+  `cohort-actions.ts`): typing the exact name of a cohort that already exists in the
+  org reuses it (a no-op update) rather than erroring or creating a confusing
+  near-duplicate — that's what makes "the same cohort from a different course"
+  actually usable from a plain text input plus a `<datalist>` of existing names,
+  instead of a separate search-and-pick flow. Because deleting a cohort now ungroups
+  learners across *every* course it's used in (not just whichever course the facilitator
+  looking at it manages), `deleteCohortAction` is ADMIN-only — creation stays open to
+  facilitators too since it's additive/low-risk. `CohortManager` (the per-course panel)
+  shows only cohorts with an enrollment in that specific course; `AddCohortForm` is
+  exported from it and reused by `/admin/cohorts` via `AddCohortToggle`, since cohort
+  creation isn't tied to being on a course page anymore.
+- **`/admin/cohorts`**: org-wide rollup of every cohort — status (derived from dates,
+  not stored), which course(s) it has enrollments in, facilitator, enrolled/completed,
+  a `ProgressBar`. The answer to "how's the March batch doing" without opening every
+  course individually, and now the natural place to create a cohort before it has any
+  enrollments anywhere. Follows the same flag-gating every other optional module does:
+  hidden from `AdminNav` when `flags.cohorts` is off (`admin/layout.tsx` fetches flags
+  and passes `cohortsEnabled` down — it used to be a static tab list) and the page
+  itself `notFound()`s if hit directly, same as the certificate page's permission check.
 
 ## When adding a new page
 

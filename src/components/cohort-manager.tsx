@@ -14,6 +14,7 @@ export type CohortSummary = {
   facilitatorName: string | null;
   startDate: string | null;
   endDate: string | null;
+  // Scoped to *this* course — a cohort's org-wide totals live on /admin/cohorts.
   enrolledCount: number;
   completedCount: number;
 };
@@ -26,15 +27,21 @@ function formatRange(start: string | null, end: string | null): string | null {
 }
 
 export function CohortManager({
-  courseId,
   coursePath,
   cohorts,
+  allCohorts,
   allFacilitators,
+  isAdmin,
 }: {
-  courseId: string;
   coursePath: string;
+  // Cohorts with at least one enrollment in *this* course — what this panel manages.
   cohorts: CohortSummary[];
+  // Every cohort in the org, for the "reuse an existing one" name suggestion — a
+  // cohort created from a different course shows up here too, since cohorts aren't
+  // owned by any single course anymore.
+  allCohorts: { id: string; name: string }[];
   allFacilitators: { id: string; name: string }[];
+  isAdmin: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
@@ -57,14 +64,16 @@ export function CohortManager({
           Cohorts
           <InfoTooltip label="What is a cohort?">
             <p>
-              A cohort is a <strong>label</strong>, not a permission — it groups learners taking
-              this course together (e.g. &quot;March 2026 Batch&quot;) purely for reporting.
+              A cohort is a <strong>label</strong>, not a permission — it groups learners across
+              courses (e.g. &quot;March 2026 Batch&quot;) purely for reporting.
             </p>
             <p className="mt-2">
-              Example: 40 learners join in March, 35 more in June. Put the March group in a
-              &quot;March 2026&quot; cohort and the June group in &quot;June 2026&quot; when
-              enrolling them, and you can see completion broken out by batch instead of one long
-              list — handy for reporting to a funder or comparing intakes.
+              Cohorts are shared org-wide, not tied to one course — every cohort here is already
+              selectable when you enroll a learner into this course, from any course it was first
+              created in. This course only shows up under a cohort once someone&apos;s actually
+              enrolled here with it selected. See{" "}
+              <span className="font-medium text-ink">Admin → Cohorts</span> for the full picture
+              across every course.
             </p>
             <p className="mt-2">
               It does <strong>not</strong> restrict what a learner can see or who a facilitator
@@ -86,13 +95,14 @@ export function CohortManager({
 
       {cohorts.length === 0 ? (
         <p className="text-xs text-grey-600">
-          No cohorts yet — add one below to start grouping learners into named batches (e.g.
-          &quot;March 2026 Batch&quot;) for reporting. See the (i) above for a full example.
+          No one&apos;s been enrolled here with a cohort yet — pick one when enrolling a learner
+          below (org-wide, from any course), or add a brand new one. See the (i) above for how
+          that works.
         </p>
       ) : (
         <ul className="flex flex-col divide-y divide-grey-200 rounded-control border border-grey-200 bg-white">
           {cohorts.map((cohort) => (
-            <CohortRow key={cohort.id} cohort={cohort} coursePath={coursePath} />
+            <CohortRow key={cohort.id} cohort={cohort} coursePath={coursePath} isAdmin={isAdmin} />
           ))}
         </ul>
       )}
@@ -103,12 +113,12 @@ export function CohortManager({
           onClick={() => setShowAdd(true)}
           className="self-start text-xs font-medium text-accent hover:underline"
         >
-          + Add a cohort
+          + Add or reuse a cohort
         </button>
       ) : (
         <AddCohortForm
-          courseId={courseId}
           coursePath={coursePath}
+          allCohorts={allCohorts}
           allFacilitators={allFacilitators}
           onDone={() => setShowAdd(false)}
         />
@@ -117,7 +127,15 @@ export function CohortManager({
   );
 }
 
-function CohortRow({ cohort, coursePath }: { cohort: CohortSummary; coursePath: string }) {
+function CohortRow({
+  cohort,
+  coursePath,
+  isAdmin,
+}: {
+  cohort: CohortSummary;
+  coursePath: string;
+  isAdmin: boolean;
+}) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const range = formatRange(cohort.startDate, cohort.endDate);
@@ -133,36 +151,43 @@ function CohortRow({ cohort, coursePath }: { cohort: CohortSummary; coursePath: 
         </span>
         {error ? <span className="text-xs text-danger">{error}</span> : null}
       </div>
-      <button
-        type="button"
-        disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await deleteCohortAction(cohort.id, coursePath);
-            if (result && !result.ok) setError(result.error);
-          })
-        }
-        className="shrink-0 text-grey-500 hover:text-danger disabled:opacity-50"
-        aria-label={`Delete ${cohort.name}`}
-      >
-        <X className="size-4" />
-      </button>
+      {isAdmin ? (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() =>
+            startTransition(async () => {
+              // Admin-only, and this deletes the cohort org-wide (see
+              // deleteCohortAction) — not just unlinking it from this course.
+              const result = await deleteCohortAction(cohort.id, coursePath);
+              if (result && !result.ok) setError(result.error);
+            })
+          }
+          className="shrink-0 text-grey-500 hover:text-danger disabled:opacity-50"
+          aria-label={`Delete ${cohort.name} everywhere`}
+          title="Deletes this cohort for every course, not just this one"
+        >
+          <X className="size-4" />
+        </button>
+      ) : null}
     </li>
   );
 }
 
-function AddCohortForm({
-  courseId,
+// Exported so /admin/cohorts (the org-wide rollup) can reuse the exact same
+// create-or-reuse form as the per-course panel, instead of a second implementation.
+export function AddCohortForm({
   coursePath,
+  allCohorts,
   allFacilitators,
   onDone,
 }: {
-  courseId: string;
   coursePath: string;
+  allCohorts: { id: string; name: string }[];
   allFacilitators: { id: string; name: string }[];
   onDone: () => void;
 }) {
-  const action = createCohortAction.bind(null, courseId, coursePath);
+  const action = createCohortAction.bind(null, coursePath);
   const [state, formAction, pending] = useActionState(action, undefined);
 
   // Collapsing the form is a side effect of a successful submit, not something to do
@@ -178,7 +203,25 @@ function AddCohortForm({
         <Label htmlFor="cohort-name" className="text-xs">
           Name
         </Label>
-        <Input id="cohort-name" name="name" placeholder="e.g. March 2026 Batch" required />
+        <Input
+          id="cohort-name"
+          name="name"
+          placeholder="e.g. March 2026 Batch"
+          list="existing-cohort-names"
+          required
+        />
+        <datalist id="existing-cohort-names">
+          {allCohorts.map((c) => (
+            <option key={c.id} value={c.name} />
+          ))}
+        </datalist>
+        {allCohorts.length > 0 ? (
+          <p className="text-xs text-grey-500">
+            Start typing to see cohorts that already exist — matching the exact name reuses it
+            instead of creating a near-duplicate. Every cohort is already selectable below when
+            enrolling a learner into this course; this is only for creating a brand new one.
+          </p>
+        ) : null}
       </div>
 
       {allFacilitators.length > 0 ? (
@@ -218,7 +261,7 @@ function AddCohortForm({
 
       {state && !state.ok ? <p className="text-xs text-danger">{state.error}</p> : null}
       <Button type="submit" size="sm" disabled={pending} className="self-start">
-        {pending ? "Adding…" : "Add cohort"}
+        {pending ? "Saving…" : "Add or reuse cohort"}
       </Button>
     </form>
   );

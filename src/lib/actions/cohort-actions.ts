@@ -3,25 +3,34 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { canManageCourseRoster } from "@/lib/people-permissions";
 
 export type CohortActionState = { ok: true } | { ok: false; error: string } | undefined;
 
-// Cohorts are a batch/scheduling label, not a permission boundary — any facilitator
-// who can already manage a course's roster can create or remove its cohorts, same as
-// enrolling learners into it. See lib/certificates.ts / people-permissions.ts for the
-// contrast with things that *do* gate access.
+// Every place a cohort can show up — kept in one spot so create/delete don't have to
+// know which pages happen to render cohort data.
+function revalidateCohortSurfaces(extraPath?: string) {
+  revalidatePath("/admin/cohorts");
+  revalidatePath("/facilitator");
+  if (extraPath) revalidatePath(extraPath);
+}
+
+// Cohorts are a batch/scheduling label, not a permission boundary — any facilitator or
+// admin can create one, same as they could already enroll a learner into any course.
+// They're org-wide now, not owned by one course (see schema.prisma), so entering the
+// name of a cohort that already exists just reuses it (upsert with a no-op update)
+// instead of erroring or creating a confusing near-duplicate — that's what makes
+// "the same cohort across multiple courses" actually usable from any course's enroll
+// panel without a separate search-and-pick step.
 export async function createCohortAction(
-  courseId: string,
   coursePath: string,
   _prevState: CohortActionState,
   formData: FormData
 ): Promise<CohortActionState> {
   const session = await auth();
   if (!session?.user) return { ok: false, error: "Not signed in." };
-
-  const allowed = await canManageCourseRoster(session.user.id, session.user.role, courseId);
-  if (!allowed) return { ok: false, error: "You don't manage this course." };
+  if (session.user.role !== "ADMIN" && session.user.role !== "FACILITATOR") {
+    return { ok: false, error: "Only admins and facilitators can create cohorts." };
+  }
 
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { ok: false, error: "Give the cohort a name." };
@@ -30,37 +39,48 @@ export async function createCohortAction(
   const startDateRaw = String(formData.get("startDate") ?? "").trim();
   const endDateRaw = String(formData.get("endDate") ?? "").trim();
 
-  await prisma.cohort.create({
-    data: {
-      courseId,
+  await prisma.cohort.upsert({
+    where: {
+      organizationId_name: { organizationId: session.user.organizationId, name },
+    },
+    create: {
+      organizationId: session.user.organizationId,
       name,
       facilitatorId,
       startDate: startDateRaw ? new Date(startDateRaw) : null,
       endDate: endDateRaw ? new Date(endDateRaw) : null,
     },
+    // Reusing an existing cohort by name shouldn't silently overwrite its facilitator
+    // or dates from whatever a different course's form happened to have filled in.
+    update: {},
   });
 
-  revalidatePath(coursePath);
+  revalidateCohortSurfaces(coursePath);
   return { ok: true };
 }
 
+// Admin-only: deleting a cohort ungroups every learner it's attached to across every
+// course it's used in (not un-enrolling them, just clearing the label) — a blast
+// radius a facilitator managing a single course shouldn't be able to trigger now that
+// cohorts aren't scoped to the course they happen to be looking at.
 export async function deleteCohortAction(
   cohortId: string,
-  coursePath: string
+  coursePath?: string
 ): Promise<CohortActionState> {
   const session = await auth();
   if (!session?.user) return { ok: false, error: "Not signed in." };
+  if (session.user.role !== "ADMIN") {
+    return { ok: false, error: "Only admins can delete a cohort." };
+  }
 
   const cohort = await prisma.cohort.findUnique({ where: { id: cohortId } });
-  if (!cohort) return { ok: false, error: "Cohort not found." };
+  if (!cohort || cohort.organizationId !== session.user.organizationId) {
+    return { ok: false, error: "Cohort not found." };
+  }
 
-  const allowed = await canManageCourseRoster(session.user.id, session.user.role, cohort.courseId);
-  if (!allowed) return { ok: false, error: "You don't manage this course." };
-
-  // Deleting a cohort ungroups its learners rather than un-enrolling them.
   await prisma.enrollment.updateMany({ where: { cohortId }, data: { cohortId: null } });
   await prisma.cohort.delete({ where: { id: cohortId } });
 
-  revalidatePath(coursePath);
+  revalidateCohortSurfaces(coursePath);
   return { ok: true };
 }

@@ -36,6 +36,7 @@ model Organization {
   users        User[]
   programs     Program[]
   courses      Course[]
+  cohorts      Cohort[]
   featureFlags FeatureFlag[]
   customLinks  CustomLink[]
   eventLogs    EventLog[]
@@ -163,7 +164,6 @@ model Course {
 
   lessons      Lesson[]
   enrollments  Enrollment[]
-  cohorts      Cohort[]
   facilitators CourseFacilitator[]
   certificates Certificate[]
 
@@ -236,12 +236,15 @@ model Progress {
   @@unique([learnerId, lessonId])
 }
 
-// Optional batch grouping for facilitated programs. Gated by the `cohorts` feature flag.
+// Batch grouping shared across every course in the org, not owned by any single one —
+// the same "March 2026 Batch" cohort can be picked when enrolling a learner into any
+// course, not just whichever course it was first created from. Gated by the `cohorts`
+// feature flag. See DESIGN_SYSTEM.md's Cohorts note.
 model Cohort {
-  id       String  @id @default(cuid())
-  courseId String
-  course   Course  @relation(fields: [courseId], references: [id])
-  name     String
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
 
   facilitatorId String?
   facilitator   User?   @relation("CohortFacilitator", fields: [facilitatorId], references: [id])
@@ -250,6 +253,11 @@ model Cohort {
   endDate   DateTime?
 
   enrollments Enrollment[]
+
+  // Org-wide now, not per-course, so the name has to be unambiguous org-wide too —
+  // this is also what makes "type an existing cohort's name in any course" reuse it
+  // instead of silently creating a near-duplicate (see createCohortAction).
+  @@unique([organizationId, name])
 }
 
 model CourseFacilitator {
