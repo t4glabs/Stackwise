@@ -6,6 +6,7 @@ import { getPrimaryOrganization } from "@/lib/org";
 import { createToken, appUrl } from "@/lib/tokens";
 import { sendEmail } from "@/lib/email";
 import { verifyEmailTemplate } from "@/lib/email-templates";
+import { logEvent } from "@/lib/log";
 
 const GENERIC_MESSAGE = "If that email needs verifying, we've sent a new link.";
 
@@ -29,7 +30,24 @@ export async function resendVerificationAction(
     const token = await createToken(user.id, "EMAIL_VERIFY");
     const link = appUrl(`/verify-email?token=${token}`);
     const { subject, html, text } = verifyEmailTemplate(org.brandName, user.name, link);
-    await sendEmail({ to: email, subject, html, text });
+    await sendEmail({
+      to: email,
+      subject,
+      html,
+      text,
+      context: { organizationId: org.id, purpose: "Verification (resend)", userId: user.id },
+    });
+  } else {
+    // Someone requested a resend for an email that's already verified, doesn't
+    // exist, or belongs to a different org — worth a trace even though the
+    // response back to them is deliberately identical either way.
+    await logEvent({
+      organizationId: org.id,
+      type: "VERIFY",
+      level: "INFO",
+      message: `Verification resend requested for ${email} (no unverified account matched)`,
+      email,
+    });
   }
 
   return GENERIC_MESSAGE;

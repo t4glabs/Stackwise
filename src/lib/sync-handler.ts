@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { syncCourses } from "@/lib/sync";
 import { getPrimaryOrganization } from "@/lib/org";
+import { logEvent } from "@/lib/log";
 
 // Shared by the BookStack webhook receiver and the manual/cron sync route. Configure
 // the webhook in BookStack (Settings > Webhooks) to POST to
@@ -13,6 +14,20 @@ export async function handleSyncRequest(request: Request) {
   }
 
   const org = await getPrimaryOrganization();
-  const result = await syncCourses(org);
-  return NextResponse.json(result);
+  try {
+    const result = await syncCourses(org);
+    return NextResponse.json(result);
+  } catch (error) {
+    // Only failures are logged here (not every routine sync) — a successful sync
+    // isn't something an admin needs a trail of, but "the lesson looks stuck/missing"
+    // usually traces back to a sync that quietly started failing.
+    await logEvent({
+      organizationId: org.id,
+      type: "SYNC",
+      level: "ERROR",
+      message: "Content sync failed",
+      detail: error instanceof Error ? error.message : String(error),
+    });
+    return NextResponse.json({ error: "sync failed" }, { status: 500 });
+  }
 }

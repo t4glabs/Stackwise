@@ -157,7 +157,7 @@ export async function importUsersFromWorkbook(
     else seenUsernames.add(username);
 
     const password = generateTempPassword();
-    await prisma.user.create({
+    const createdUser = await prisma.user.create({
       data: {
         organizationId,
         role,
@@ -176,7 +176,14 @@ export async function importUsersFromWorkbook(
       const { subject, html, text } = credentialsTemplate(org.brandName, row.name, email, password);
       // Best-effort per row — one failed send shouldn't abort the rest of the batch,
       // and the results workbook (with the password) is the fallback either way.
-      await sendEmail({ to: email, subject, html, text }).catch(() => {});
+      // sendEmail logs the outcome either way (see lib/email.ts).
+      await sendEmail({
+        to: email,
+        subject,
+        html,
+        text,
+        context: { organizationId, purpose: "Login details (bulk import)", userId: createdUser.id },
+      });
     }
 
     results.push({ name: row.name, email: email ?? "", username, password, status: "Created" });

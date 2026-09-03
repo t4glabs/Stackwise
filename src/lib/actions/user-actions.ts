@@ -92,9 +92,15 @@ export async function createUser(
   if (email && formData.get("sendCredentialsEmail") === "on") {
     const org = await getPrimaryOrganization();
     const { subject, html, text } = credentialsTemplate(org.brandName, name, email, tempPassword);
-    await sendEmail({ to: email, subject, html, text }).catch(() => {
-      // Best-effort: the account is already created and its password is shown
-      // on-screen regardless, so a failed send here shouldn't fail account creation.
+    // Best-effort: the account is already created and its password is shown
+    // on-screen regardless, so a failed send here shouldn't fail account creation —
+    // sendEmail logs the outcome either way (see lib/email.ts).
+    await sendEmail({
+      to: email,
+      subject,
+      html,
+      text,
+      context: { organizationId: org.id, purpose: "Login details", userId: created.id },
     });
   }
 

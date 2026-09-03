@@ -38,6 +38,7 @@ model Organization {
   courses      Course[]
   featureFlags FeatureFlag[]
   customLinks  CustomLink[]
+  eventLogs    EventLog[]
 }
 
 enum LinkPlacement {
@@ -101,6 +102,7 @@ model User {
   cohortsFacilitated  Cohort[]            @relation("CohortFacilitator")
   certificates        Certificate[]
   verificationTokens  VerificationToken[]
+  eventLogs           EventLog[]
 
   @@index([organizationId])
 }
@@ -304,4 +306,39 @@ model VerificationToken {
   createdAt  DateTime     @default(now())
 
   @@index([userId, purpose])
+}
+
+enum LogLevel {
+  INFO
+  ERROR
+}
+
+// Admin-facing troubleshooting trail — for a support workflow where the person
+// reporting a problem ("I can't log in", "I didn't get the email") is rarely able to
+// describe it in terms an admin can act on. See lib/log.ts and /admin/logs. Pruned
+// automatically (see PRUNE_AFTER_DAYS in lib/log.ts) so this never grows unbounded.
+model EventLog {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  // Coarse category, not a free-for-all string enum — see LOG_TYPES in lib/log.ts for
+  // the fixed set ("LOGIN", "REGISTER", "VERIFY", "PASSWORD_RESET", "EMAIL", "SYNC").
+  type    String
+  level   LogLevel
+  message String
+  // Extra machine detail (e.g. the raw Mailgun error) — shown but not required.
+  detail  String?
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  // Kept even when userId is null (account since deleted, or no account exists yet —
+  // e.g. a failed registration) so a lookup by email still works.
+  email  String?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, level, createdAt])
+  @@index([email])
 }

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { consumeToken } from "@/lib/tokens";
+import { getPrimaryOrganization } from "@/lib/org";
+import { logEvent } from "@/lib/log";
 import { Container } from "@/components/ui/container";
 import { Button } from "@/components/ui/button";
 
@@ -12,8 +14,24 @@ export default async function VerifyEmailPage({
   const { token } = await searchParams;
 
   const userId = token ? await consumeToken(token, "EMAIL_VERIFY") : null;
+  const org = await getPrimaryOrganization();
   if (userId) {
-    await prisma.user.update({ where: { id: userId }, data: { emailVerifiedAt: new Date() } });
+    const user = await prisma.user.update({ where: { id: userId }, data: { emailVerifiedAt: new Date() } });
+    await logEvent({
+      organizationId: org.id,
+      type: "VERIFY",
+      level: "INFO",
+      message: `Email verified for ${user.email ?? user.username}`,
+      userId: user.id,
+      email: user.email,
+    });
+  } else {
+    await logEvent({
+      organizationId: org.id,
+      type: "VERIFY",
+      level: "ERROR",
+      message: "Invalid or expired verification link used",
+    });
   }
 
   return (

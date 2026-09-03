@@ -10,6 +10,7 @@ import { generateUniqueUsername } from "@/lib/username";
 import { createToken, appUrl } from "@/lib/tokens";
 import { sendEmail } from "@/lib/email";
 import { verifyEmailTemplate } from "@/lib/email-templates";
+import { logEvent } from "@/lib/log";
 
 // Self-registration always requires a real email, regardless of the
 // learner_email_optional flag — that flag is for staff-created accounts a human
@@ -56,7 +57,21 @@ export async function registerAction(_prevState: string | undefined, formData: F
   const token = await createToken(user.id, "EMAIL_VERIFY");
   const link = appUrl(`/verify-email?token=${token}`);
   const { subject, html, text } = verifyEmailTemplate(org.brandName, user.name, link);
-  await sendEmail({ to: email, subject, html, text });
+  await sendEmail({
+    to: email,
+    subject,
+    html,
+    text,
+    context: { organizationId: org.id, purpose: "Verification", userId: user.id },
+  });
+  await logEvent({
+    organizationId: org.id,
+    type: "REGISTER",
+    level: "INFO",
+    message: `New account registered: ${email}`,
+    userId: user.id,
+    email,
+  });
 
   redirect(`/register/check-email?email=${encodeURIComponent(email)}`);
 }

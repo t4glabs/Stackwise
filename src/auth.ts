@@ -2,6 +2,8 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
+import { logEvent } from "@/lib/log";
+import { getPrimaryOrganization } from "@/lib/org";
 import type { Role } from "@/generated/prisma/client";
 
 // Learner/Facilitator/Admin accounts live entirely in our own DB, separate from
@@ -23,6 +25,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
+        // The single gate every credentials login passes through regardless of call
+        // path, so it's the right place to record the outcome for /admin/logs —
+        // loginAction's own pre-checks give a friendlier in-page message, but this is
+        // what actually happened.
+        const org = await getPrimaryOrganization();
+
         // Most accounts log in with their email; accounts created without one (see
         // learner_email_optional / facilitator_email_optional flags) use a username
         // instead — one field on the login form covers both.
@@ -30,15 +38,53 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const user = await prisma.user.findFirst({
           where: { OR: [{ email: value }, { username: value }] },
         });
-        if (!user) return null;
+        if (!user) {
+          await logEvent({
+            organizationId: org.id,
+            type: "LOGIN",
+            level: "ERROR",
+            message: `Login failed for "${value}": no account found`,
+            email: value,
+          });
+          return null;
+        }
 
         const valid = await verifyPassword(password, user.passwordHash);
-        if (!valid) return null;
+        if (!valid) {
+          await logEvent({
+            organizationId: org.id,
+            type: "LOGIN",
+            level: "ERROR",
+            message: `Login failed for ${user.email ?? user.username}: incorrect password`,
+            userId: user.id,
+            email: user.email,
+          });
+          return null;
+        }
 
         // Defense in depth — loginAction already checks this with a friendlier
         // message before ever calling signIn, but this is the actual gate: nothing
         // reaches a session without it, regardless of which code path calls signIn.
-        if (!user.emailVerifiedAt) return null;
+        if (!user.emailVerifiedAt) {
+          await logEvent({
+            organizationId: org.id,
+            type: "LOGIN",
+            level: "ERROR",
+            message: `Login blocked for ${user.email ?? user.username}: email not verified`,
+            userId: user.id,
+            email: user.email,
+          });
+          return null;
+        }
+
+        await logEvent({
+          organizationId: org.id,
+          type: "LOGIN",
+          level: "INFO",
+          message: `Login succeeded for ${user.email ?? user.username}`,
+          userId: user.id,
+          email: user.email,
+        });
 
         return {
           id: user.id,
