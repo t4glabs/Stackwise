@@ -152,6 +152,21 @@ Fonts loaded in `app/layout.tsx` via `next/font/google`:
   early); use a `<div>` wrapper instead, same flex classes. The panel itself resets
   `normal-case`/`font-normal`/`tracking-normal` since it commonly ends up inside
   uppercase table headers whose text styling would otherwise cascade into it.
+- **`LanguageSwitcher`** (header, both desktop and mobile menu): Indian-language
+  machine translation for learners, matching the same scope the org already curated
+  on the BookStack side. Same click-toggle/outside-close pattern as `InfoTooltip`, but
+  drives Google's Website Translator widget under the hood instead of rendering
+  Google's own (unstylable) dropdown — `GoogleTranslateLoader` mounts that widget once
+  in the root layout, off-screen. **Selecting a language sets the `googtrans` cookie
+  and reloads the page** — don't "simplify" this to a live DOM update by finding
+  `.goog-te-combo` and dispatching a change event; that's the trick every tutorial
+  shows, but as of this widget's current version the actual `<select>` lives inside a
+  cross-origin `translate.google.com` iframe our script can't reach (verified live —
+  it returns zero matches). The cookie is the only thing Google's own script actually
+  watches to auto-apply translation on load, hence the reload. Google's own
+  banner/tooltip chrome is suppressed in `globals.css`. If the language list changes,
+  it's just the `LANGUAGES` array in `language-switcher.tsx` — codes are Google
+  Translate's own ISO codes.
 
 ## When adding a new page
 

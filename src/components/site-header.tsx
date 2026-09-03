@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Container } from "@/components/ui/container";
 import { NavLink } from "@/components/nav-link";
 import { MobileMenu } from "@/components/mobile-menu";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { ExternalLink } from "lucide-react";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -104,6 +105,7 @@ export async function SiteHeader() {
         </nav>
 
         <div className="hidden shrink-0 items-center gap-3 sm:flex">
+          <LanguageSwitcher variant="desktop" />
           {userBlock}
           {user ? (
             <form action={signOutAction}>
@@ -121,6 +123,7 @@ export async function SiteHeader() {
             {customLinkNodes}
           </nav>
           <div className="flex flex-col gap-3 border-t border-stone-200 pt-4">
+            <LanguageSwitcher variant="mobile" />
             {userBlock}
             {user ? (
               <form action={signOutAction} className="w-full">

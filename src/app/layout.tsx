@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Figtree, Source_Serif_4, Geist_Mono } from "next/font/google";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { GoogleTranslateLoader } from "@/components/google-translate-loader";
 import { getPrimaryOrganization } from "@/lib/org";
 import { isValidHexColor } from "@/lib/color";
 import "./globals.css";
@@ -50,6 +51,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <style>{`:root { --color-accent: ${accentColor}; }`}</style>
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
+        <GoogleTranslateLoader />
         <SiteHeader />
         <main className="flex-1">{children}</main>
         <SiteFooter />

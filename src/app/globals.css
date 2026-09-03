@@ -126,3 +126,25 @@ body {
     display: none !important;
   }
 }
+
+/* Google's Website Translator (see google-translate-loader.tsx / language-switcher.tsx)
+   comes with its own chrome we don't want — a top banner iframe (which also force-
+   shifts <body> down via an inline `top` style), a hover tooltip on translated text,
+   and a highlight color on the original-text popup. We drive translation through our
+   own header UI, so all of Google's own UI stays suppressed. */
+.goog-te-banner-frame,
+.goog-te-balloon-frame,
+.goog-tooltip,
+#goog-gt-tt,
+.skiptranslate > iframe {
+  display: none !important;
+}
+
+body {
+  top: 0 !important;
+}
+
+.goog-text-highlight {
+  background: none !important;
+  box-shadow: none !important;
+}
