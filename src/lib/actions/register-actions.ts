@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma/client";
 import { hashPassword } from "@/lib/password";
 import { getPrimaryOrganization } from "@/lib/org";
 import { isFeatureEnabled } from "@/lib/flags";
@@ -42,17 +43,27 @@ export async function registerAction(_prevState: string | undefined, formData: F
 
   const username = await generateUniqueUsername(email);
 
-  const user = await prisma.user.create({
-    data: {
-      organizationId: org.id,
-      role: "LEARNER",
-      username,
-      name: parsed.data.name,
-      email,
-      passwordHash: await hashPassword(parsed.data.password),
-      emailVerifiedAt: null,
-    },
-  });
+  let user;
+  try {
+    user = await prisma.user.create({
+      data: {
+        organizationId: org.id,
+        role: "LEARNER",
+        username,
+        name: parsed.data.name,
+        email,
+        passwordHash: await hashPassword(parsed.data.password),
+        emailVerifiedAt: null,
+      },
+    });
+  } catch (err) {
+    // Same email submitted twice at once (double-click, two tabs) races past the
+    // findUnique check above — the unique constraint is the real guard either way.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      return "That email is already registered — try logging in instead.";
+    }
+    throw err;
+  }
 
   const token = await createToken(user.id, "EMAIL_VERIFY");
   const link = appUrl(`/verify-email?token=${token}`);

@@ -13,7 +13,10 @@ export default auth((req) => {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (pathname.startsWith("/admin") && role !== "ADMIN") {
+  // config.matcher below also lists /api/admin/:path* — without checking that prefix
+  // here too, every route under it would rely entirely on its own handler for
+  // authorization instead of also being covered by this gate.
+  if ((pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) && role !== "ADMIN") {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 

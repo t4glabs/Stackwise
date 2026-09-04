@@ -10,18 +10,21 @@ import { logEvent } from "@/lib/log";
 
 const GENERIC_MESSAGE = "If that email needs verifying, we've sent a new link.";
 
+export type ResendVerificationState = { ok: true; message: string } | { ok: false; error: string } | undefined;
+
 // Always returns the same message regardless of whether the email exists or is
 // already verified — same anti-enumeration reasoning as the password-reset request
-// (see password-reset-actions.ts).
+// (see password-reset-actions.ts). Only for the *success* path (ok: true) — an
+// invalid-input error is a distinct case the form needs to render differently.
 export async function resendVerificationAction(
-  _prevState: string | undefined,
+  _prevState: ResendVerificationState,
   formData: FormData
-): Promise<string> {
+): Promise<ResendVerificationState> {
   const email = String(formData.get("email") ?? "")
     .trim()
     .toLowerCase();
   const parsed = z.email().safeParse(email);
-  if (!parsed.success) return "Enter a valid email address.";
+  if (!parsed.success) return { ok: false, error: "Enter a valid email address." };
 
   const org = await getPrimaryOrganization();
   const user = await prisma.user.findUnique({ where: { email } });
@@ -50,5 +53,5 @@ export async function resendVerificationAction(
     });
   }
 
-  return GENERIC_MESSAGE;
+  return { ok: true, message: GENERIC_MESSAGE };
 }

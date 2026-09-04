@@ -118,11 +118,18 @@ export async function canManageCourseRoster(
   role: Role,
   courseId: string
 ): Promise<boolean> {
-  if (role === "ADMIN") return true;
-  if (role !== "FACILITATOR") return false;
+  if (role !== "ADMIN" && role !== "FACILITATOR") return false;
 
-  const course = await prisma.course.findUnique({ where: { id: courseId } });
-  if (!course) return false;
+  const [actor, course] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { organizationId: true } }),
+    prisma.course.findUnique({ where: { id: courseId }, select: { organizationId: true } }),
+  ]);
+  // Without this, a courseId from a different organization would fall through to
+  // that OTHER org's facilitator_assignment flag below — an org with the flag off
+  // would grant any facilitator, from any org, roster access to its courses.
+  if (!actor || !course || actor.organizationId !== course.organizationId) return false;
+
+  if (role === "ADMIN") return true;
 
   const assignmentScoped = await isFeatureEnabled(course.organizationId, "facilitator_assignment");
   if (!assignmentScoped) return true;

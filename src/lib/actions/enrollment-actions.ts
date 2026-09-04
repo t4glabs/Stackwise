@@ -16,6 +16,11 @@ export async function enrollInCourse(courseId: string, coursePath: string) {
   const user = await requireLearner();
   const course = await prisma.course.findUniqueOrThrow({ where: { id: courseId } });
 
+  // Matches the course-config UI's own promise ("Off means learners can't see or
+  // enroll in it") — the enroll button is already hidden for an unpublished course,
+  // this is the server-side half of that guarantee.
+  if (!course.published) throw new Error("This course isn't open for enrollment.");
+
   const allowed = await isFeatureEnabled(course.organizationId, "self_enrollment");
   if (!allowed) throw new Error("Self-enrollment is turned off for this organization");
 
@@ -31,13 +36,23 @@ export async function enrollInCourse(courseId: string, coursePath: string) {
 export async function markLessonComplete(lessonId: string, coursePath: string) {
   const user = await requireLearner();
 
+  const lesson = await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId } });
+
+  // The lesson page itself only ever renders this action's form for an enrolled
+  // learner (redirects otherwise) — this is the server-side half of that gate.
+  // Without it, maybeCompleteCourse below would try to update an enrollment row
+  // that was never created and throw (Prisma P2025) on a single-lesson course.
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { learnerId_courseId: { learnerId: user.id, courseId: lesson.courseId } },
+  });
+  if (!enrollment) throw new Error("You're not enrolled in this course.");
+
   await prisma.progress.upsert({
     where: { learnerId_lessonId: { learnerId: user.id, lessonId } },
     create: { learnerId: user.id, lessonId, viewedAt: new Date(), completedAt: new Date() },
     update: { completedAt: new Date() },
   });
 
-  const lesson = await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId } });
   await maybeCompleteCourse(user.id, lesson.courseId);
 
   revalidatePath(coursePath);

@@ -22,6 +22,11 @@ export async function issueCertificateAction(
   const session = await auth();
   if (!session?.user) return { ok: false, error: "Not signed in." };
 
+  const course = await prisma.course.findUnique({ where: { id: courseId } });
+  if (!course || course.organizationId !== session.user.organizationId) {
+    return { ok: false, error: "Course not found." };
+  }
+
   const allowed = await canManageCourseRoster(session.user.id, session.user.role, courseId);
   if (!allowed) return { ok: false, error: "You don't manage this course." };
 
@@ -51,6 +56,14 @@ export async function revokeCertificateAction(
   const session = await auth();
   if (!session?.user || session.user.role !== "ADMIN") {
     return { ok: false, error: "Only admins can revoke a certificate." };
+  }
+
+  const certificate = await prisma.certificate.findUnique({
+    where: { id: certificateId },
+    include: { course: true },
+  });
+  if (!certificate || certificate.course.organizationId !== session.user.organizationId) {
+    return { ok: false, error: "Certificate not found." };
   }
 
   await prisma.certificate.delete({ where: { id: certificateId } });

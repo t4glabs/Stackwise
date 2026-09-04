@@ -32,18 +32,19 @@ export async function createToken(userId: string, purpose: TokenPurpose): Promis
 // leaking which failure mode occurred.
 export async function consumeToken(rawToken: string, purpose: TokenPurpose): Promise<string | null> {
   const tokenHash = hashToken(rawToken);
-  const record = await prisma.verificationToken.findUnique({ where: { tokenHash } });
+  const now = new Date();
 
-  if (!record || record.purpose !== purpose || record.usedAt || record.expiresAt < new Date()) {
-    return null;
-  }
-
-  await prisma.verificationToken.update({
-    where: { id: record.id },
-    data: { usedAt: new Date() },
+  // updateMany with usedAt/expiresAt in the where clause makes the check-and-consume
+  // atomic — two concurrent requests with the same token (e.g. a double-click, or the
+  // email client prefetching the link) can't both succeed.
+  const result = await prisma.verificationToken.updateMany({
+    where: { tokenHash, purpose, usedAt: null, expiresAt: { gt: now } },
+    data: { usedAt: now },
   });
+  if (result.count === 0) return null;
 
-  return record.userId;
+  const record = await prisma.verificationToken.findUnique({ where: { tokenHash } });
+  return record?.userId ?? null;
 }
 
 export function appUrl(path: string): string {

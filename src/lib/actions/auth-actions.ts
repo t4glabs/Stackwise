@@ -11,6 +11,17 @@ const ROLE_HOME: Record<string, string> = {
   LEARNER: "/dashboard",
 };
 
+// callbackUrl comes from the login page's own URL query string (proxy.ts sets it to
+// a same-origin pathname when redirecting to /login, but nothing stops someone from
+// sharing a link with a different value in it) — redirecting straight to whatever a
+// visitor's URL happens to contain is an open-redirect: a link like
+// /login?callbackUrl=https://evil.example would send someone to an attacker's site
+// immediately after they type in their real password. Only ever follow it if it's a
+// same-origin path.
+function isSafeRedirect(path: string): boolean {
+  return path.startsWith("/") && !path.startsWith("//") && !path.startsWith("/\\");
+}
+
 export async function loginAction(_prevState: string | undefined, formData: FormData) {
   const identifier = String(formData.get("identifier") ?? "")
     .trim()
@@ -37,7 +48,7 @@ export async function loginAction(_prevState: string | undefined, formData: Form
   // courses" screen. Route by the account's actual role unless the visit was
   // specifically redirected here from another page (e.g. hit a protected course URL).
   let redirectTo = explicitCallbackUrl;
-  if (!redirectTo || redirectTo === "/dashboard") {
+  if (!redirectTo || redirectTo === "/dashboard" || !isSafeRedirect(redirectTo)) {
     redirectTo = (account && ROLE_HOME[account.role]) || "/dashboard";
   }
 

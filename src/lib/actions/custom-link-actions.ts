@@ -8,7 +8,9 @@ import type { LinkPlacement } from "@/generated/prisma/client";
 
 const schema = z.object({
   label: z.string().trim().min(1, "Label is required").max(40, "Keep the label short"),
-  url: z.url("Enter a full URL, e.g. https://example.org"),
+  // httpUrl (not url) — these render as real <a href> tags site-wide, so a
+  // javascript: URI here would be a stored XSS hitting every visitor who clicks it.
+  url: z.httpUrl("Enter a full URL, e.g. https://example.org"),
   openInNewTab: z.boolean(),
 });
 
@@ -33,15 +35,20 @@ export async function addCustomLink(
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
 
-  const count = await prisma.customLink.count({
+  // max(order)+1, not count — count drifts from the actual ordering after any
+  // add/delete/add cycle (delete the 2nd of 3 links and the next add reuses order 2,
+  // colliding with the link already there instead of landing after it).
+  const last = await prisma.customLink.findFirst({
     where: { organizationId: session.user.organizationId, placement },
+    orderBy: { order: "desc" },
+    select: { order: true },
   });
 
   await prisma.customLink.create({
     data: {
       organizationId: session.user.organizationId,
       placement,
-      order: count,
+      order: (last?.order ?? -1) + 1,
       ...parsed.data,
     },
   });

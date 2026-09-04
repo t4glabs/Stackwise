@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { uploadBrandImage, removeBrandImage } from "@/lib/actions/branding-upload-actions";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -18,12 +18,35 @@ export function BrandImageUpload({
   currentUrl: string | null;
   previewClassName: string;
 }) {
-  const action = uploadBrandImage.bind(null, kind);
-  const [state, formAction, pending] = useActionState(action, undefined);
-  const [removed, setRemoved] = useState(false);
-  const [removing, startRemoving] = useTransition();
+  const formRef = useRef<HTMLFormElement>(null);
+  // Whichever action the admin took most recently wins. Both Upload and Remove set
+  // this directly from their own async callback (never via an effect reacting to
+  // some other piece of state), so there's no stale-state ordering question — each
+  // click is simply the latest write.
+  const [shownUrl, setShownUrl] = useState(currentUrl);
+  const [feedback, setFeedback] = useState<{ ok: boolean; message: string } | null>(null);
+  const [pending, startTransition] = useTransition();
 
-  const shownUrl = state?.ok ? state.url : removed ? null : currentUrl;
+  function handleUpload(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    startTransition(async () => {
+      const result = await uploadBrandImage(kind, undefined, formData);
+      if (result?.ok) {
+        setShownUrl(result.url);
+        setFeedback({ ok: true, message: "Uploaded." });
+        formRef.current?.reset();
+      } else {
+        setFeedback({ ok: false, message: result?.error ?? "Something went wrong." });
+      }
+    });
+  }
+
+  function handleRemove() {
+    setShownUrl(null);
+    setFeedback(null);
+    startTransition(() => removeBrandImage(kind));
+  }
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -39,7 +62,7 @@ export function BrandImageUpload({
             <span className="text-[11px] text-grey-500">None set</span>
           )}
         </div>
-        <form action={formAction} className="flex min-w-0 flex-wrap items-center gap-2">
+        <form ref={formRef} onSubmit={handleUpload} className="flex min-w-0 flex-wrap items-center gap-2">
           <input
             type="file"
             name="file"
@@ -52,23 +75,15 @@ export function BrandImageUpload({
           </Button>
         </form>
         {shownUrl ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            disabled={removing}
-            onClick={() => {
-              setRemoved(true);
-              startRemoving(() => removeBrandImage(kind));
-            }}
-          >
+          <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={handleRemove}>
             Remove
           </Button>
         ) : null}
       </div>
       <p className="text-xs text-grey-500">{hint}</p>
-      {state && !state.ok ? <p className="text-xs text-danger">{state.error}</p> : null}
-      {state?.ok ? <p className="text-xs text-success">Uploaded.</p> : null}
+      {feedback ? (
+        <p className={`text-xs ${feedback.ok ? "text-success" : "text-danger"}`}>{feedback.message}</p>
+      ) : null}
     </div>
   );
 }

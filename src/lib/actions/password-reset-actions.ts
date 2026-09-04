@@ -11,17 +11,21 @@ import { logEvent } from "@/lib/log";
 
 const GENERIC_MESSAGE = "If an account exists for that email, we've sent a reset link.";
 
+export type RequestResetState = { ok: true; message: string } | { ok: false; error: string } | undefined;
+
 // Always the same response whether or not the email exists — telling an attacker
-// "no account with that email" would let them enumerate registered addresses.
+// "no account with that email" would let them enumerate registered addresses. Note
+// this is only for the *success* path (ok: true) — an invalid-input error is a
+// distinct case the form needs to render differently (and let the visitor retry).
 export async function requestPasswordResetAction(
-  _prevState: string | undefined,
+  _prevState: RequestResetState,
   formData: FormData
-): Promise<string> {
+): Promise<RequestResetState> {
   const email = String(formData.get("email") ?? "")
     .trim()
     .toLowerCase();
   const parsed = z.email().safeParse(email);
-  if (!parsed.success) return "Enter a valid email address.";
+  if (!parsed.success) return { ok: false, error: "Enter a valid email address." };
 
   const org = await getPrimaryOrganization();
   const user = await prisma.user.findUnique({ where: { email } });
@@ -50,7 +54,7 @@ export async function requestPasswordResetAction(
     });
   }
 
-  return GENERIC_MESSAGE;
+  return { ok: true, message: GENERIC_MESSAGE };
 }
 
 export type RedeemResetState = { ok: true } | { ok: false; error: string } | undefined;
