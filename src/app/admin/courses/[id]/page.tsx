@@ -26,7 +26,10 @@ export default async function AdminCourseEditPage({
       program: true,
       facilitators: true,
       enrollments: {
-        include: { learner: true, cohort: { include: { facilitator: true } } },
+        include: {
+          learner: true,
+          cohort: { include: { facilitators: { include: { facilitator: { select: { name: true } } } } } },
+        },
         orderBy: { enrolledAt: "desc" },
       },
       certificates: true,
@@ -50,7 +53,8 @@ export default async function AdminCourseEditPage({
       cohortSummaryById.set(enrollment.cohort.id, {
         id: enrollment.cohort.id,
         name: enrollment.cohort.name,
-        facilitatorName: enrollment.cohort.facilitator?.name ?? null,
+        facilitatorName:
+          enrollment.cohort.facilitators.map((f) => f.facilitator.name).join(", ") || null,
         startDate: enrollment.cohort.startDate?.toISOString() ?? null,
         endDate: enrollment.cohort.endDate?.toISOString() ?? null,
         enrolledCount: 1,
@@ -110,6 +114,7 @@ export default async function AdminCourseEditPage({
         certificatesFlagOn={flags.certificates}
         externalLinkCoursesFlagOn={flags.external_link_courses}
         facilitatorAssignmentFlagOn={flags.facilitator_assignment}
+        cohortRestrictedFacilitatorsOnly={flags.cohort_restricted_facilitators_only}
         assignedFacilitatorIds={course.facilitators.map((f) => f.facilitatorId)}
         allPrograms={programs.map((p) => p.name)}
         allFacilitators={facilitators.map((f) => ({ id: f.id, name: f.name }))}
@@ -124,7 +129,6 @@ export default async function AdminCourseEditPage({
                 coursePath={coursePath}
                 cohorts={cohortSummaries}
                 allCohorts={allCohorts}
-                allFacilitators={facilitators.map((f) => ({ id: f.id, name: f.name }))}
                 isAdmin={session!.user.role === "ADMIN"}
               />
             ) : null}

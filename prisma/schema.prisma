@@ -100,7 +100,8 @@ model User {
   enrollments         Enrollment[]
   progress            Progress[]
   facilitatingCourses CourseFacilitator[]
-  cohortsFacilitated  Cohort[]            @relation("CohortFacilitator")
+  facilitatingCohorts CohortFacilitator[]
+  cohortMemberships   CohortMember[]
   certificates        Certificate[]
   verificationTokens  VerificationToken[]
   eventLogs           EventLog[]
@@ -165,6 +166,7 @@ model Course {
   lessons      Lesson[]
   enrollments  Enrollment[]
   facilitators CourseFacilitator[]
+  cohorts      CohortCourse[]
   certificates Certificate[]
 
   @@unique([organizationId, bookstackBookId])
@@ -236,28 +238,78 @@ model Progress {
   @@unique([learnerId, lessonId])
 }
 
-// Batch grouping shared across every course in the org, not owned by any single one —
-// the same "March 2026 Batch" cohort can be picked when enrolling a learner into any
-// course, not just whichever course it was first created from. Gated by the `cohorts`
-// feature flag. See DESIGN_SYSTEM.md's Cohorts note.
+// A cohort is a real, standing group of learners now — not just a label copied onto
+// individual enrollments. Two independent things can be attached to it:
+//   - members (CohortMember): who's in the group
+//   - courses (CohortCourse): which courses the group is following
+// Attaching a course auto-enrolls every current member; adding a member auto-enrolls
+// them in every course the cohort already follows (see lib/cohort-sync.ts). This is
+// the same shape as Moodle's "cohort sync" enrolment method — enroll the *group*, not
+// each person into each course by hand. Course-level, one-off enrollment (the
+// pre-existing EnrollLearnerPanel flow, still tagging Enrollment.cohortId directly)
+// keeps working exactly as before for anyone not using cohort-sync — this is additive,
+// not a replacement. Gated by the `cohorts` feature flag. See DESIGN_SYSTEM.md.
 model Cohort {
   id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   name           String
 
-  facilitatorId String?
-  facilitator   User?   @relation("CohortFacilitator", fields: [facilitatorId], references: [id])
-
   startDate DateTime?
   endDate   DateTime?
 
-  enrollments Enrollment[]
+  enrollments  Enrollment[]
+  members      CohortMember[]
+  courses      CohortCourse[]
+  facilitators CohortFacilitator[]
 
   // Org-wide now, not per-course, so the name has to be unambiguous org-wide too —
   // this is also what makes "type an existing cohort's name in any course" reuse it
   // instead of silently creating a near-duplicate (see createCohortAction).
   @@unique([organizationId, name])
+}
+
+// Standing membership — independent of any specific course enrollment. This is what a
+// cohort-restricted facilitator's visibility is actually scoped to (see
+// lib/people-permissions.ts), and what lib/cohort-sync.ts auto-enrolls into whichever
+// courses the cohort follows.
+model CohortMember {
+  id        String @id @default(cuid())
+  cohortId  String
+  cohort    Cohort @relation(fields: [cohortId], references: [id])
+  learnerId String
+  learner   User   @relation(fields: [learnerId], references: [id])
+
+  @@unique([cohortId, learnerId])
+}
+
+// "This cohort follows this course" — attaching one triggers lib/cohort-sync.ts to
+// enroll every current member; detaching does *not* retroactively un-enroll anyone
+// (same non-destructive principle as deleting a cohort — see cohort-actions.ts).
+model CohortCourse {
+  id       String @id @default(cuid())
+  cohortId String
+  cohort   Cohort @relation(fields: [cohortId], references: [id])
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id])
+
+  @@unique([cohortId, courseId])
+}
+
+// A facilitator linked here has their access to this specific cohort's members scoped
+// down (see lib/people-permissions.ts) rather than seeing every learner in whatever
+// course those members happen to be enrolled in. Whether a given facilitator ends up
+// "cohort-restricted" in practice is entirely a consequence of *which* assignment
+// type(s) an admin uses for them — this table, CourseFacilitator, or both — not a
+// separate mode flag. Mirrors CourseFacilitator's shape deliberately.
+model CohortFacilitator {
+  id            String @id @default(cuid())
+  cohortId      String
+  cohort        Cohort @relation(fields: [cohortId], references: [id])
+  facilitatorId String
+  facilitator   User   @relation(fields: [facilitatorId], references: [id])
+
+  @@unique([cohortId, facilitatorId])
 }
 
 model CourseFacilitator {

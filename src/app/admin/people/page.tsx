@@ -29,10 +29,19 @@ export default async function AdminPeoplePage({
   const organizationId = session!.user.organizationId;
   const flags = await getFlags(organizationId);
 
-  const users = await prisma.user.findMany({
-    where: { organizationId, role: activeTab.role },
-    orderBy: { name: "asc" },
-  });
+  const [users, allCohorts] = await Promise.all([
+    prisma.user.findMany({
+      where: { organizationId, role: activeTab.role },
+      orderBy: { name: "asc" },
+    }),
+    activeTab.role === "LEARNER" && flags.cohorts
+      ? prisma.cohort.findMany({
+          where: { organizationId },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        })
+      : Promise.resolve([]),
+  ]);
 
   return (
     <div className="flex min-w-0 flex-col gap-6">
@@ -83,6 +92,8 @@ export default async function AdminPeoplePage({
               action={createLearnerAction}
               personLabel="Learner"
               emailOptional={flags.learner_email_optional}
+              cohortsFlagOn={flags.cohorts}
+              allCohorts={allCohorts}
             />
           ) : (
             <AddPersonPanel
@@ -115,7 +126,15 @@ export default async function AdminPeoplePage({
               <tbody>
                 {users.map((user) => (
                   <tr key={user.id} className="border-b border-grey-200 last:border-0 hover:bg-grey-50/60">
-                    <td className="px-5 py-3.5 font-medium text-ink">{user.name}</td>
+                    <td className="px-5 py-3.5 font-medium text-ink">
+                      {activeTab.role === "FACILITATOR" && flags.cohorts ? (
+                        <Link href={`/admin/people/facilitators/${user.id}`} className="text-accent hover:underline">
+                          {user.name}
+                        </Link>
+                      ) : (
+                        user.name
+                      )}
+                    </td>
                     <td className="px-4 py-3.5 font-mono text-[13px] text-grey-700">
                       <span className="flex items-center gap-2">
                         {user.email ?? user.username}

@@ -11,11 +11,15 @@ export function AddPersonPanel({
   action,
   personLabel,
   emailOptional,
+  cohortsFlagOn,
+  allCohorts,
 }: {
   role: "LEARNER" | "FACILITATOR";
   action: (state: CreateUserState, formData: FormData) => Promise<CreateUserState>;
   personLabel: string;
   emailOptional: boolean;
+  cohortsFlagOn?: boolean;
+  allCohorts?: { id: string; name: string }[];
 }) {
   const [mode, setMode] = useState<"single" | "bulk">("single");
 
@@ -40,7 +44,13 @@ export function AddPersonPanel({
       {mode === "single" ? (
         <CreateUserForm action={action} personLabel={personLabel} emailOptional={emailOptional} />
       ) : (
-        <BulkUploadPanel role={role} personLabel={personLabel} emailOptional={emailOptional} />
+        <BulkUploadPanel
+          role={role}
+          personLabel={personLabel}
+          emailOptional={emailOptional}
+          cohortsFlagOn={cohortsFlagOn}
+          allCohorts={allCohorts}
+        />
       )}
     </div>
   );

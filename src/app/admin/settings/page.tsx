@@ -46,33 +46,72 @@ export default async function AdminSettingsPage() {
         </div>
 
         <Card className="divide-y divide-grey-200 p-0">
-          {(Object.keys(FEATURE_FLAGS) as FeatureFlagKey[]).map((key) => {
-            const flag = FEATURE_FLAGS[key];
-            const example = "example" in flag ? flag.example : null;
-            return (
-              <div key={key} className="flex items-center justify-between gap-6 px-6 py-4">
-                <div>
-                  {/* div, not p — InfoTooltip's popover renders a div, and a div
-                      inside a p tag is invalid HTML that causes a hydration
-                      mismatch. See DESIGN_SYSTEM.md's InfoTooltip note. */}
-                  <div className="flex items-center gap-1.5 text-sm font-semibold text-ink">
-                    {flag.label}
-                    {example ? (
-                      <InfoTooltip label={`More about ${flag.label}`}>
-                        {example.split("\n\n").map((para, i) => (
-                          <p key={i} className={i > 0 ? "mt-2" : undefined}>
-                            {para}
-                          </p>
-                        ))}
-                      </InfoTooltip>
-                    ) : null}
+          {(Object.keys(FEATURE_FLAGS) as FeatureFlagKey[])
+            .filter((key) => !("parent" in FEATURE_FLAGS[key]))
+            .map((key) => {
+              const flag = FEATURE_FLAGS[key];
+              const example = "example" in flag ? flag.example : null;
+              // Sub-settings only make sense — and only show up — once their parent
+              // module is switched on; a "cohort-only facilitators" toggle with no
+              // cohorts enabled has nothing to scope.
+              const children = (Object.keys(FEATURE_FLAGS) as FeatureFlagKey[]).filter(
+                (k) => FEATURE_FLAGS[k] && "parent" in FEATURE_FLAGS[k] && FEATURE_FLAGS[k].parent === key
+              );
+              return (
+                <div key={key} className="flex flex-col gap-4 px-6 py-4">
+                  <div className="flex items-center justify-between gap-6">
+                    <div>
+                      {/* div, not p — InfoTooltip's popover renders a div, and a div
+                          inside a p tag is invalid HTML that causes a hydration
+                          mismatch. See DESIGN_SYSTEM.md's InfoTooltip note. */}
+                      <div className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+                        {flag.label}
+                        {example ? (
+                          <InfoTooltip label={`More about ${flag.label}`}>
+                            {example.split("\n\n").map((para, i) => (
+                              <p key={i} className={i > 0 ? "mt-2" : undefined}>
+                                {para}
+                              </p>
+                            ))}
+                          </InfoTooltip>
+                        ) : null}
+                      </div>
+                      <p className="text-sm text-grey-600">{flag.description}</p>
+                    </div>
+                    <FlagToggle flagKey={key} enabled={flags[key]} />
                   </div>
-                  <p className="text-sm text-grey-600">{flag.description}</p>
+
+                  {flags[key] && children.length > 0 ? (
+                    <div className="flex flex-col gap-4 border-l-2 border-grey-200 pl-4">
+                      {children.map((childKey) => {
+                        const child = FEATURE_FLAGS[childKey];
+                        const childExample = "example" in child ? child.example : null;
+                        return (
+                          <div key={childKey} className="flex items-center justify-between gap-6">
+                            <div>
+                              <div className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+                                {child.label}
+                                {childExample ? (
+                                  <InfoTooltip label={`More about ${child.label}`}>
+                                    {childExample.split("\n\n").map((para, i) => (
+                                      <p key={i} className={i > 0 ? "mt-2" : undefined}>
+                                        {para}
+                                      </p>
+                                    ))}
+                                  </InfoTooltip>
+                                ) : null}
+                              </div>
+                              <p className="text-sm text-grey-600">{child.description}</p>
+                            </div>
+                            <FlagToggle flagKey={childKey} enabled={flags[childKey]} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
                 </div>
-                <FlagToggle flagKey={key} enabled={flags[key]} />
-              </div>
-            );
-          })}
+              );
+            })}
         </Card>
       </div>
 

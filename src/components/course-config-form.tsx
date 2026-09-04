@@ -26,6 +26,7 @@ export function CourseConfigForm({
   certificatesFlagOn,
   externalLinkCoursesFlagOn,
   facilitatorAssignmentFlagOn,
+  cohortRestrictedFacilitatorsOnly,
   assignedFacilitatorIds,
   allPrograms,
   allFacilitators,
@@ -41,6 +42,11 @@ export function CourseConfigForm({
   certificatesFlagOn: boolean;
   externalLinkCoursesFlagOn: boolean;
   facilitatorAssignmentFlagOn: boolean;
+  // Cohorts sub-setting: when on, facilitator access comes entirely from cohort
+  // links (set on the facilitator's own page), so this course-level checklist stops
+  // being a real way to grant access — hide it rather than leave a control that
+  // looks like it does something it no longer does.
+  cohortRestrictedFacilitatorsOnly: boolean;
   assignedFacilitatorIds: string[];
   allPrograms: string[];
   allFacilitators: { id: string; name: string }[];
@@ -164,7 +170,7 @@ export function CourseConfigForm({
             </div>
           ) : null}
 
-          {facilitatorAssignmentFlagOn ? (
+          {facilitatorAssignmentFlagOn && !cohortRestrictedFacilitatorsOnly ? (
             <div className="flex flex-col gap-2">
               <Label>Facilitators</Label>
               {allFacilitators.length === 0 ? (
@@ -189,8 +195,9 @@ export function CourseConfigForm({
               )}
             </div>
           ) : (
-            // Facilitator assignment is org-wide off (any facilitator manages any
-            // course — see people-permissions.ts) — keep whatever assignments already
+            // Either facilitator assignment is org-wide off (any facilitator manages
+            // any course), or cohort-only facilitators is on (access comes from
+            // cohort links instead) — either way, keep whatever assignments already
             // exist as-is rather than letting a save on this form silently wipe them.
             assignedFacilitatorIds.map((id) => (
               <input key={id} type="hidden" name="facilitatorIds" value={id} />

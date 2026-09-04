@@ -168,31 +168,75 @@ Fonts loaded in `app/layout.tsx` via `next/font/google`:
   it's just the `LANGUAGES` array in `language-switcher.tsx` — codes are Google
   Translate's own ISO codes.
 - **Cohorts are org-wide, not per-course** (`Cohort.organizationId`, unique on
-  `[organizationId, name]` — see schema.prisma). They started out belonging to a
-  single course; that was a real limitation once a program spans several courses and
-  a batch needs to be the same cohort across all of them, so it changed. A cohort's
-  relationship to a course is now *entirely derived* from its `Enrollment` rows (join
-  through `Enrollment.cohortId → cohortId`) — there's no `Course.cohorts` relation to
-  reach for. **Creating a cohort is an upsert keyed on name** (`createCohortAction` in
-  `cohort-actions.ts`): typing the exact name of a cohort that already exists in the
-  org reuses it (a no-op update) rather than erroring or creating a confusing
-  near-duplicate — that's what makes "the same cohort from a different course"
-  actually usable from a plain text input plus a `<datalist>` of existing names,
-  instead of a separate search-and-pick flow. Because deleting a cohort now ungroups
-  learners across *every* course it's used in (not just whichever course the facilitator
-  looking at it manages), `deleteCohortAction` is ADMIN-only — creation stays open to
-  facilitators too since it's additive/low-risk. `CohortManager` (the per-course panel)
-  shows only cohorts with an enrollment in that specific course; `AddCohortForm` is
-  exported from it and reused by `/admin/cohorts` via `AddCohortToggle`, since cohort
-  creation isn't tied to being on a course page anymore.
+  `[organizationId, name]` — see schema.prisma). **Creating a cohort is an upsert
+  keyed on name** (`createCohortAction` in `cohort-actions.ts`): typing the exact name
+  of a cohort that already exists in the org reuses it (a no-op update) rather than
+  erroring or creating a confusing near-duplicate — that's what makes "the same
+  cohort from a different course" actually usable from a plain text input plus a
+  `<datalist>` of existing names, instead of a separate search-and-pick flow.
+  `CohortManager` (the per-course panel) shows only cohorts with an enrollment in that
+  specific course; `AddCohortForm` is exported from it and reused by `/admin/cohorts`
+  via `AddCohortToggle`, since cohort creation isn't tied to being on a course page.
+- **Cohort membership is a standing relationship, not just an enrollment-time tag**
+  (`CohortMember`, `CohortCourse`, `CohortFacilitator` — three join tables added
+  alongside the original `Cohort`/`Enrollment.cohortId` label). A learner can be a
+  member of a cohort with zero enrollments (e.g. right after a bulk import, before any
+  course is attached); a course can be attached to a cohort with zero members yet. This
+  is deliberate — it's what lets `lib/cohort-sync.ts` auto-enroll in both directions,
+  mirroring Moodle's "cohort sync" enrolment method: `attachCourseToCohort` enrolls
+  every current member into the newly-attached course; `addCohortMember` enrolls the
+  new member into every course the cohort already follows. **Sync is one-way and
+  non-destructive** — detaching a course or removing a member only stops *future*
+  auto-enrollment; it never un-enrolls anyone or touches existing progress
+  (`detachCourseFromCohort`/`removeCohortMember` are pure `deleteMany`s on the join
+  row, nothing else). The original tag-based flow (picking a cohort while enrolling a
+  learner into one course, from `EnrollLearnerPanel`) still exists side by side — it's
+  a lighter-weight way to label a single enrollment without adding someone as a
+  standing member, and doesn't have to go through membership at all.
+- **Facilitator↔cohort scoping is an admin-only grant, separate from course
+  assignment** (`CohortFacilitator`, linked from the facilitator's own detail page at
+  `/admin/people/facilitators/[id]`, not from the cohort or the course). A
+  facilitator's reach is the *union* of direct course assignments
+  (`CourseFacilitator`, unrestricted — sees everyone in that course) and cohort links
+  (`CohortFacilitator`, narrowed — sees only that cohort's members, in whichever
+  courses the cohort follows). The permission functions live in
+  `lib/people-permissions.ts` (`canManageCohort`, `canManageLearner`,
+  `canManageEnrollment`) and follow one conservative rule: a facilitator with **any**
+  `CohortFacilitator` link loses the "no course-assignment restriction configured, so
+  see everyone" fallback specifically for cohort-adjacent checks — once you've opted
+  into cohort scoping at all, that becomes your entire reach for people, even if this
+  org doesn't otherwise require course assignment (`facilitator_assignment` off). A
+  facilitator who has never linked a cohort is completely unaffected — this is what
+  keeps the feature opt-in rather than a behavior change for every existing
+  deployment. `/facilitator/cohorts/[id]` is the facilitator-reachable equivalent of
+  the admin cohort detail page — not under `/admin/*` (role-gated in `proxy.ts`), so it
+  checks `canManageCohort` directly and `notFound()`s otherwise, same pattern as the
+  certificate page's permission check.
+- **`cohort_restricted_facilitators_only`**: a sub-setting of the `cohorts` flag
+  (`lib/flags.ts`), for deployments where *every* facilitator should be cohort-scoped
+  and course-level assignment shouldn't be offered as a path at all. A flag entry
+  declares `parent: "cohorts" as const` to opt into this; `/admin/settings` renders it
+  nested under its parent's row (indented, left-bordered) and only when the parent
+  itself is on — see the settings page's flag-rendering loop. Turning `cohorts` on by
+  itself does **not** imply this; it's a separate, explicit choice so a deployment
+  that just wants cohorts for batch reporting doesn't have its facilitators' course
+  assignment silently disabled. When it's on, `CourseConfigForm` hides the
+  course-level "Facilitators" checklist (existing assignments are preserved as hidden
+  inputs, not wiped) since it stops being how access gets granted.
 - **`/admin/cohorts`**: org-wide rollup of every cohort — status (derived from dates,
-  not stored), which course(s) it has enrollments in, facilitator, enrolled/completed,
-  a `ProgressBar`. The answer to "how's the March batch doing" without opening every
-  course individually, and now the natural place to create a cohort before it has any
-  enrollments anywhere. Follows the same flag-gating every other optional module does:
-  hidden from `AdminNav` when `flags.cohorts` is off (`admin/layout.tsx` fetches flags
-  and passes `cohortsEnabled` down — it used to be a static tab list) and the page
-  itself `notFound()`s if hit directly, same as the certificate page's permission check.
+  not stored), member count, which course(s) it follows (`CohortCourse`, so a
+  freshly-attached course with zero members still shows up), facilitators, and a
+  `ProgressBar` over its enrollments. Links into `/admin/cohorts/[id]` for the full
+  membership/course-attachment management UI (`CohortDetailPanel`, shared with the
+  facilitator-side equivalent). Follows the same flag-gating every other optional
+  module does: hidden from `AdminNav` when `flags.cohorts` is off and the page itself
+  `notFound()`s if hit directly.
+- **Bulk import can add a batch straight into a cohort** (`bulk-upload-panel.tsx`'s
+  "Cohort for this batch" field, learner uploads only, shown when `cohorts` is on) —
+  same create-or-reuse-by-name upsert as `AddCohortForm`, resolved in the API route
+  before the import runs, then passed through `importUsersFromWorkbook` so every
+  created account becomes a standing `CohortMember` (not just a label), auto-enrolling
+  into whatever courses the cohort already follows.
 
 ## When adding a new page
 

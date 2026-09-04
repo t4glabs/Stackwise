@@ -13,6 +13,7 @@ import { sendEmail } from "@/lib/email";
 import { credentialsTemplate, adminSetupTemplate } from "@/lib/email-templates";
 import { createToken, appUrl } from "@/lib/tokens";
 import { logEvent } from "@/lib/log";
+import { canManageLearner } from "@/lib/people-permissions";
 import { revalidatePath } from "next/cache";
 import type { Role } from "@/generated/prisma/client";
 
@@ -250,7 +251,13 @@ export async function resetPasswordAction(
   }
 
   const isAdmin = session.user.role === "ADMIN";
-  const isFacilitatorResettingLearner = session.user.role === "FACILITATOR" && target.role === "LEARNER";
+  // canManageLearner is a no-op (always true) for any facilitator who's never been
+  // cohort-scoped — this only actually narrows anything once an admin has linked the
+  // facilitator to a cohort. See its own comment in people-permissions.ts.
+  const isFacilitatorResettingLearner =
+    session.user.role === "FACILITATOR" &&
+    target.role === "LEARNER" &&
+    (await canManageLearner(session.user.id, session.user.role, target.id));
   if (!isAdmin && !isFacilitatorResettingLearner) {
     return { ok: false, error: "You don't have permission to reset this password." };
   }

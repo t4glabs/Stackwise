@@ -7,6 +7,7 @@ import { generateUniqueUsername } from "@/lib/username";
 import { getPrimaryOrganization } from "@/lib/org";
 import { sendEmail } from "@/lib/email";
 import { credentialsTemplate } from "@/lib/email-templates";
+import { addCohortMember } from "@/lib/cohort-sync";
 import type { Role } from "@/generated/prisma/client";
 
 const SHEET_NAME = "People" as const;
@@ -95,7 +96,11 @@ export async function importUsersFromWorkbook(
   organizationId: string,
   createdById: string,
   emailOptional: boolean,
-  sendCredentialsEmail: boolean = false
+  sendCredentialsEmail: boolean = false,
+  // Learner-only — adds every created account to this cohort as a standing member
+  // (see lib/cohort-sync.ts), not just a one-time tag, so the batch auto-enrolls
+  // into whatever courses the cohort already follows.
+  cohortId: string | null = null
 ): Promise<ImportSummary> {
   const rows = readRows(buffer).filter((r) => r.name || r.email || r.username);
   const org = sendCredentialsEmail ? await getPrimaryOrganization() : null;
@@ -171,6 +176,10 @@ export async function importUsersFromWorkbook(
         emailVerifiedAt: new Date(),
       },
     });
+
+    if (cohortId && role === "LEARNER") {
+      await addCohortMember(cohortId, createdUser.id);
+    }
 
     if (org && email) {
       const { subject, html, text } = credentialsTemplate(org.brandName, row.name, email, password);

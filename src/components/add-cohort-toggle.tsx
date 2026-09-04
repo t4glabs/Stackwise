@@ -8,9 +8,8 @@ import { Card } from "@/components/ui/card";
 // create-or-reuse form every course's "Manage cohorts" panel uses (see
 // cohort-manager.tsx), just without a course context: revalidating "/admin/cohorts"
 // itself is enough here, this page is already the canonical place cohorts show up.
-export function AddCohortToggle({ allCohorts, allFacilitators }: {
+export function AddCohortToggle({ allCohorts }: {
   allCohorts: { id: string; name: string }[];
-  allFacilitators: { id: string; name: string }[];
 }) {
   const [open, setOpen] = useState(false);
 
@@ -31,7 +30,6 @@ export function AddCohortToggle({ allCohorts, allFacilitators }: {
       <AddCohortForm
         coursePath="/admin/cohorts"
         allCohorts={allCohorts}
-        allFacilitators={allFacilitators}
         onDone={() => setOpen(false)}
       />
     </Card>

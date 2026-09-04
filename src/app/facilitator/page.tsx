@@ -24,16 +24,22 @@ export default async function FacilitatorPage() {
   // explicitly assigned them to (matches canManageCourseRoster in people-permissions.ts).
   const courseInclude = {
     lessons: true,
-    enrollments: { include: { learner: true, cohort: { include: { facilitator: true } } } },
+    enrollments: {
+      include: {
+        learner: true,
+        cohort: { include: { facilitators: { include: { facilitator: { select: { name: true } } } } } },
+      },
+    },
     certificates: true,
   } as const;
 
-  const [courses, allFacilitators, allCohorts] = await Promise.all([
+  const [courses, allCohorts, managedCohortLinks] = await Promise.all([
     flags.facilitator_assignment
       ? prisma.courseFacilitator
           .findMany({
             where: { facilitatorId: session!.user.id },
             include: { course: { include: courseInclude } },
+            orderBy: { course: { title: "asc" } },
           })
           .then((rows) => rows.map((a) => a.course))
       : prisma.course.findMany({
@@ -41,18 +47,32 @@ export default async function FacilitatorPage() {
           include: courseInclude,
           orderBy: { title: "asc" },
         }),
-    prisma.user.findMany({
-      where: { organizationId: session!.user.organizationId, role: "FACILITATOR" },
-      orderBy: { name: "asc" },
-    }),
     // Org-wide, not scoped to any one course — see the note on the admin course page.
     prisma.cohort.findMany({
       where: { organizationId: session!.user.organizationId },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
+    // Cohorts this facilitator has been explicitly scoped to (see the facilitator
+    // detail page in admin) — a separate, standing access path from the course
+    // assignments above. Empty for any facilitator who's never used cohorts.
+    flags.cohorts
+      ? prisma.cohortFacilitator.findMany({
+          where: { facilitatorId: session!.user.id },
+          include: {
+            cohort: {
+              include: {
+                courses: { include: { course: { select: { id: true, title: true } } } },
+                members: { select: { learnerId: true } },
+              },
+            },
+          },
+          orderBy: { cohort: { name: "asc" } },
+        })
+      : Promise.resolve([]),
   ]);
   const isAdmin = session!.user.role === "ADMIN";
+  const managedCohorts = managedCohortLinks.map((link) => link.cohort);
 
   return (
     <Container className="flex flex-col gap-8 py-12">
@@ -66,6 +86,37 @@ export default async function FacilitatorPage() {
         </Button>
       </div>
 
+      {managedCohorts.length > 0 ? (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-1.5">
+            <Eyebrow>Your cohorts</Eyebrow>
+            <InfoTooltip label="What is this?">
+              <p>
+                Cohorts you&apos;ve been scoped to manage — your access to people here comes from
+                these, not the course assignments below.
+              </p>
+            </InfoTooltip>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {managedCohorts.map((cohort) => (
+              <Link
+                key={cohort.id}
+                href={`/facilitator/cohorts/${cohort.id}`}
+                className="flex flex-col gap-1.5 rounded-card border border-grey-200 bg-white p-4 hover:border-accent"
+              >
+                <span className="font-medium text-ink">{cohort.name}</span>
+                <span className="text-xs text-grey-600">
+                  {cohort.members.length} member{cohort.members.length === 1 ? "" : "s"} ·{" "}
+                  {cohort.courses.length === 0
+                    ? "no courses yet"
+                    : cohort.courses.map((cc) => cc.course.title).join(", ")}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {courses.length === 0 ? (
         <p className="text-sm text-grey-600">
           {flags.facilitator_assignment
@@ -74,9 +125,24 @@ export default async function FacilitatorPage() {
         </p>
       ) : (
         <div className="flex flex-col gap-5">
-          {courses.map((course) => {
+          {await Promise.all(courses.map(async (course) => {
             const totalLessons = course.lessons.length;
             const certificateByLearnerId = new Map(course.certificates.map((c) => [c.learnerId, c.id]));
+            // One query per course instead of one per enrolled learner — LearnerRow used
+            // to run its own prisma.progress.count() per row, which meant a course with
+            // 200 enrollments issued 200 separate queries just to render the table.
+            const doneCounts = totalLessons
+              ? await prisma.progress.groupBy({
+                  by: ["learnerId"],
+                  where: {
+                    completedAt: { not: null },
+                    lesson: { courseId: course.id },
+                    learnerId: { in: course.enrollments.map((e) => e.learnerId) },
+                  },
+                  _count: { _all: true },
+                })
+              : [];
+            const doneByLearnerId = new Map(doneCounts.map((d) => [d.learnerId, d._count._all]));
             // Cohorts aren't owned by a course anymore — this is whichever cohorts
             // happen to have an enrollment in *this* course, derived from the
             // enrollments themselves (see the same pattern on the admin course page).
@@ -91,7 +157,8 @@ export default async function FacilitatorPage() {
                 cohortSummaryById.set(enrollment.cohort.id, {
                   id: enrollment.cohort.id,
                   name: enrollment.cohort.name,
-                  facilitatorName: enrollment.cohort.facilitator?.name ?? null,
+                  facilitatorName:
+                    enrollment.cohort.facilitators.map((f) => f.facilitator.name).join(", ") || null,
                   startDate: enrollment.cohort.startDate?.toISOString() ?? null,
                   endDate: enrollment.cohort.endDate?.toISOString() ?? null,
                   enrolledCount: 1,
@@ -115,7 +182,6 @@ export default async function FacilitatorPage() {
                         coursePath="/facilitator"
                         cohorts={cohortSummaries}
                         allCohorts={allCohorts}
-                        allFacilitators={allFacilitators.map((f) => ({ id: f.id, name: f.name }))}
                         isAdmin={isAdmin}
                       />
                     ) : null}
@@ -169,6 +235,7 @@ export default async function FacilitatorPage() {
                             courseId={course.id}
                             status={enrollment.status}
                             totalLessons={totalLessons}
+                            done={doneByLearnerId.get(enrollment.learnerId) ?? 0}
                             certificatesFlagOn={flags.certificates}
                             certificateId={certificateByLearnerId.get(enrollment.learnerId) ?? null}
                             cohortsFlagOn={flags.cohorts}
@@ -181,20 +248,21 @@ export default async function FacilitatorPage() {
                 )}
               </Card>
             );
-          })}
+          }))}
         </div>
       )}
     </Container>
   );
 }
 
-async function LearnerRow({
+function LearnerRow({
   learnerName,
   learnerId,
   learnerRole,
   courseId,
   status,
   totalLessons,
+  done,
   certificatesFlagOn,
   certificateId,
   cohortsFlagOn,
@@ -206,20 +274,12 @@ async function LearnerRow({
   courseId: string;
   status: string;
   totalLessons: number;
+  done: number;
   certificatesFlagOn: boolean;
   certificateId: string | null;
   cohortsFlagOn: boolean;
   cohortName: string | null;
 }) {
-  const done = totalLessons
-    ? await prisma.progress.count({
-        where: {
-          learnerId,
-          completedAt: { not: null },
-          lesson: { courseId },
-        },
-      })
-    : 0;
   const percent = totalLessons ? (done / totalLessons) * 100 : 0;
 
   // Nothing stops a staff account from also enrolling in a course as a learner (no

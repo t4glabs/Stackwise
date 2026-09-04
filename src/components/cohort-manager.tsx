@@ -30,7 +30,6 @@ export function CohortManager({
   coursePath,
   cohorts,
   allCohorts,
-  allFacilitators,
   isAdmin,
 }: {
   coursePath: string;
@@ -40,7 +39,6 @@ export function CohortManager({
   // cohort created from a different course shows up here too, since cohorts aren't
   // owned by any single course anymore.
   allCohorts: { id: string; name: string }[];
-  allFacilitators: { id: string; name: string }[];
   isAdmin: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -119,7 +117,6 @@ export function CohortManager({
         <AddCohortForm
           coursePath={coursePath}
           allCohorts={allCohorts}
-          allFacilitators={allFacilitators}
           onDone={() => setShowAdd(false)}
         />
       )}
@@ -179,12 +176,10 @@ function CohortRow({
 export function AddCohortForm({
   coursePath,
   allCohorts,
-  allFacilitators,
   onDone,
 }: {
   coursePath: string;
   allCohorts: { id: string; name: string }[];
-  allFacilitators: { id: string; name: string }[];
   onDone: () => void;
 }) {
   const action = createCohortAction.bind(null, coursePath);
@@ -223,26 +218,6 @@ export function AddCohortForm({
           </p>
         ) : null}
       </div>
-
-      {allFacilitators.length > 0 ? (
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="cohort-facilitator" className="text-xs">
-            Facilitator (optional)
-          </Label>
-          <select
-            id="cohort-facilitator"
-            name="facilitatorId"
-            className="h-9 rounded-control border border-grey-200 bg-white px-3 text-sm text-ink"
-          >
-            <option value="">None</option>
-            {allFacilitators.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      ) : null}
 
       <div className="flex gap-2">
         <div className="flex flex-1 flex-col gap-1">

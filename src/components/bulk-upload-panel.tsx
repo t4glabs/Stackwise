@@ -1,15 +1,23 @@
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 export function BulkUploadPanel({
   role,
   personLabel,
   emailOptional,
+  cohortsFlagOn = false,
+  allCohorts = [],
 }: {
   role: "LEARNER" | "FACILITATOR";
   personLabel: string;
   emailOptional: boolean;
+  // Learner uploads only — cohorts group learners, not facilitators.
+  cohortsFlagOn?: boolean;
+  allCohorts?: { id: string; name: string }[];
 }) {
   const peoplePlural = personLabel.toLowerCase() + "s";
+  const showCohortField = role === "LEARNER" && cohortsFlagOn;
 
   return (
     <div className="flex flex-col gap-4">
@@ -39,6 +47,30 @@ export function BulkUploadPanel({
         className="flex flex-col gap-3 rounded-card border border-grey-200 bg-grey-50 p-4"
       >
         <input type="hidden" name="role" value={role} />
+
+        {showCohortField ? (
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="bulk-cohort" className="text-xs">
+              Cohort for this batch (optional)
+            </Label>
+            <Input
+              id="bulk-cohort"
+              name="cohortName"
+              placeholder="e.g. March 2026 Batch"
+              list="bulk-existing-cohort-names"
+            />
+            <datalist id="bulk-existing-cohort-names">
+              {allCohorts.map((c) => (
+                <option key={c.id} value={c.name} />
+              ))}
+            </datalist>
+            <p className="text-xs text-grey-500">
+              Adds everyone in this file to that cohort — matching an existing name reuses it.
+              Leave blank to create accounts without one.
+            </p>
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap items-center gap-3">
           <input
             type="file"

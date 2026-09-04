@@ -32,25 +32,21 @@ export default async function AdminCohortsPage() {
   const enabled = await isFeatureEnabled(organizationId, "cohorts");
   if (!enabled) notFound();
 
-  const [cohorts, facilitators] = await Promise.all([
-    prisma.cohort.findMany({
-      where: { organizationId },
-      include: {
-        facilitator: { select: { name: true } },
-        // A cohort isn't owned by one course anymore, so its enrollments can span
-        // several — each enrollment carries its own course reference.
-        enrollments: { select: { status: true, course: { select: { id: true, title: true } } } },
-      },
-      orderBy: [{ startDate: "desc" }, { name: "asc" }],
-    }),
-    prisma.user.findMany({
-      where: { organizationId, role: "FACILITATOR" },
-      orderBy: { name: "asc" },
-    }),
-  ]);
+  const cohorts = await prisma.cohort.findMany({
+    where: { organizationId },
+    include: {
+      facilitators: { include: { facilitator: { select: { name: true } } } },
+      members: { select: { learnerId: true } },
+      // Which courses this cohort actually follows (CohortCourse) — separate from
+      // enrollments, since a freshly attached course has no enrollments yet if the
+      // cohort has no members, but should still show up here.
+      courses: { include: { course: { select: { id: true, title: true } } } },
+      enrollments: { select: { status: true } },
+    },
+    orderBy: [{ startDate: "desc" }, { name: "asc" }],
+  });
 
   const allCohorts = cohorts.map((c) => ({ id: c.id, name: c.name }));
-  const allFacilitators = facilitators.map((f) => ({ id: f.id, name: f.name }));
 
   return (
     <div className="flex flex-col gap-6">
@@ -71,8 +67,9 @@ export default async function AdminCohortsPage() {
               batch is doing across everything it&apos;s enrolled in, in one place.
             </p>
             <p className="mt-2">
-              It does <strong>not</strong> restrict what a learner can see or who a facilitator
-              can manage.
+              By itself, a cohort is just a label — it doesn&apos;t restrict anything. Optionally,
+              a facilitator can be scoped to one or more cohorts (from that facilitator&apos;s own
+              page) so they only see that cohort&apos;s members, wherever they&apos;re enrolled.
             </p>
           </InfoTooltip>
         </div>
@@ -82,7 +79,7 @@ export default async function AdminCohortsPage() {
         </p>
       </div>
 
-      <AddCohortToggle allCohorts={allCohorts} allFacilitators={allFacilitators} />
+      <AddCohortToggle allCohorts={allCohorts} />
 
       {cohorts.length === 0 ? (
         <p className="text-sm text-grey-600">No cohorts yet — add one above to get started.</p>
@@ -92,11 +89,11 @@ export default async function AdminCohortsPage() {
             <thead>
               <tr className="border-b border-grey-200 bg-grey-50 text-left text-xs font-semibold uppercase tracking-wide text-grey-600">
                 <th className="px-5 py-3">Cohort</th>
+                <th className="px-4 py-3">Members</th>
                 <th className="px-4 py-3">Courses</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Facilitator</th>
+                <th className="px-4 py-3">Facilitators</th>
                 <th className="px-4 py-3">Dates</th>
-                <th className="px-4 py-3">Enrolled</th>
                 <th className="px-4 py-3">Progress</th>
               </tr>
             </thead>
@@ -108,23 +105,25 @@ export default async function AdminCohortsPage() {
                 const status = deriveStatus(cohort.startDate, cohort.endDate);
                 const range = formatRange(cohort.startDate, cohort.endDate);
 
-                const courseById = new Map(cohort.enrollments.map((e) => [e.course.id, e.course.title]));
-                const courses = Array.from(courseById.entries());
-
                 return (
                   <tr key={cohort.id} className="border-b border-grey-200 last:border-0 hover:bg-grey-50/60">
-                    <td className="px-5 py-3.5 font-medium text-ink">{cohort.name}</td>
+                    <td className="px-5 py-3.5 font-medium text-ink">
+                      <Link href={`/admin/cohorts/${cohort.id}`} className="text-accent hover:underline">
+                        {cohort.name}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3.5 text-grey-600">{cohort.members.length}</td>
                     <td className="px-4 py-3.5">
-                      {courses.length === 0 ? (
-                        <span className="text-grey-400">No enrollments yet</span>
+                      {cohort.courses.length === 0 ? (
+                        <span className="text-grey-400">None yet</span>
                       ) : (
                         <div className="flex flex-wrap gap-x-1 gap-y-1">
-                          {courses.map(([courseId, title], i) => (
-                            <span key={courseId} className="whitespace-nowrap">
-                              <Link href={`/admin/courses/${courseId}`} className="text-accent hover:underline">
-                                {title}
+                          {cohort.courses.map((cc, i) => (
+                            <span key={cc.course.id} className="whitespace-nowrap">
+                              <Link href={`/admin/courses/${cc.course.id}`} className="text-accent hover:underline">
+                                {cc.course.title}
                               </Link>
-                              {i < courses.length - 1 ? "," : ""}
+                              {i < cohort.courses.length - 1 ? "," : ""}
                             </span>
                           ))}
                         </div>
@@ -137,13 +136,17 @@ export default async function AdminCohortsPage() {
                         {status}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3.5 text-grey-600">{cohort.facilitator?.name ?? "—"}</td>
-                    <td className="px-4 py-3.5 text-grey-600">{range ?? "—"}</td>
                     <td className="px-4 py-3.5 text-grey-600">
-                      {enrolledCount} enrolled, {completedCount} completed
+                      {cohort.facilitators.length === 0
+                        ? "—"
+                        : cohort.facilitators.map((f) => f.facilitator.name).join(", ")}
                     </td>
-                    <td className="w-40 px-4 py-3.5">
+                    <td className="px-4 py-3.5 text-grey-600">{range ?? "—"}</td>
+                    <td className="w-48 px-4 py-3.5">
                       <ProgressBar percent={percent} />
+                      <p className="mt-0.5 text-xs text-grey-500">
+                        {enrolledCount} enrolled, {completedCount} completed
+                      </p>
                     </td>
                   </tr>
                 );

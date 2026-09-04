@@ -35,7 +35,6 @@ export async function createCohortAction(
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { ok: false, error: "Give the cohort a name." };
 
-  const facilitatorId = String(formData.get("facilitatorId") ?? "").trim() || null;
   const startDateRaw = String(formData.get("startDate") ?? "").trim();
   const endDateRaw = String(formData.get("endDate") ?? "").trim();
 
@@ -46,12 +45,12 @@ export async function createCohortAction(
     create: {
       organizationId: session.user.organizationId,
       name,
-      facilitatorId,
       startDate: startDateRaw ? new Date(startDateRaw) : null,
       endDate: endDateRaw ? new Date(endDateRaw) : null,
     },
-    // Reusing an existing cohort by name shouldn't silently overwrite its facilitator
-    // or dates from whatever a different course's form happened to have filled in.
+    // Reusing an existing cohort by name shouldn't silently overwrite its dates from
+    // whatever a different course's form happened to have filled in. Facilitators are
+    // linked separately, from a facilitator's own detail page (admin-only grant).
     update: {},
   });
 

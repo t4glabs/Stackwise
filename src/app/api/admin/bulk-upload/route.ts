@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { getFlags } from "@/lib/flags";
 import { canManageRole } from "@/lib/people-permissions";
 import { importUsersFromWorkbook, buildResultsWorkbook, workbookToBuffer } from "@/lib/bulk-import";
@@ -38,6 +39,20 @@ export async function POST(request: Request) {
   const emailOptional = role === "LEARNER" ? flags.learner_email_optional : flags.facilitator_email_optional;
   const sendCredentialsEmail = formData.get("sendCredentialsEmail") === "on";
 
+  // Learner-only, and only when Cohorts is on — same create-or-reuse-by-name upsert
+  // as the single-cohort form (see createCohortAction), just resolved here instead
+  // of as a separate step, so the whole batch lands as standing cohort members.
+  let cohortId: string | null = null;
+  const cohortName = String(formData.get("cohortName") ?? "").trim();
+  if (role === "LEARNER" && flags.cohorts && cohortName) {
+    const cohort = await prisma.cohort.upsert({
+      where: { organizationId_name: { organizationId: session.user.organizationId, name: cohortName } },
+      create: { organizationId: session.user.organizationId, name: cohortName },
+      update: {},
+    });
+    cohortId = cohort.id;
+  }
+
   let summary;
   try {
     const buffer = await file.arrayBuffer();
@@ -47,7 +62,8 @@ export async function POST(request: Request) {
       session.user.organizationId,
       session.user.id,
       emailOptional,
-      sendCredentialsEmail
+      sendCredentialsEmail,
+      cohortId
     );
   } catch {
     backTo.searchParams.set(

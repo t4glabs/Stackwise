@@ -50,6 +50,31 @@ export const FEATURE_FLAGS = {
       "Turning this off just hides cohort UI everywhere; any cohorts you've already created are kept.",
     default: false,
   },
+  // A sub-setting of `cohorts` — `parent` is what makes /admin/settings render this
+  // nested under the Cohorts row instead of as its own top-level module, and only
+  // when Cohorts itself is on (see admin/settings/page.tsx). This is deliberately
+  // off by default: turning Cohorts on does *not* imply this. A deployment that just
+  // wants cohorts for batch reporting shouldn't have its facilitators' course
+  // assignment silently disabled — that's a real behavior change some orgs will want
+  // and others never will, so it's its own explicit choice, not a side effect.
+  cohort_restricted_facilitators_only: {
+    label: "Cohort-only facilitators",
+    parent: "cohorts" as const,
+    description:
+      "Facilitators are assigned to cohorts only, not directly to courses — for " +
+      "deployments where every facilitator should be scoped to one group, not the " +
+      "whole roster of any course they're given.",
+    example:
+      "With this on, a facilitator's access comes entirely from which cohort(s) they're " +
+      "linked to (set on the facilitator's own page) — they see only that cohort's members, " +
+      "across whichever courses that cohort follows. The course-level \"Facilitators\" list on " +
+      "each course's settings is hidden, since it stops being how access gets granted.\n\n" +
+      "Leave this off if you want both options available — some facilitators assigned broadly " +
+      "to specific courses (seeing everyone enrolled in them), others scoped to just one " +
+      "cohort. Most orgs that don't have separate partner groups to keep apart will never " +
+      "need this on at all.",
+    default: false,
+  },
   certificates: {
     label: "Certificates",
     description: "Auto-generated completion certificates.",
