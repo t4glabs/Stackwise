@@ -18,7 +18,7 @@ export async function GET(
 
   const course = await prisma.course.findUnique({
     where: { organizationId_slug: { organizationId: org.id, slug } },
-    include: { lessons: { orderBy: { order: "asc" } } },
+    include: { lessons: { where: { hidden: false }, orderBy: { order: "asc" } } },
   });
 
   if (!course || !course.published || !course.downloadableWorkbook || course.type === "EXTERNAL_LINK") {

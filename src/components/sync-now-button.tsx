@@ -19,7 +19,8 @@ export function SyncNowButton() {
       {state?.ok ? (
         <p className="text-xs text-success">
           Synced — {state.booksScanned} book{state.booksScanned === 1 ? "" : "s"} scanned
-          {state.newlyDiscovered > 0 ? `, ${state.newlyDiscovered} new` : ""}.
+          {state.newlyDiscovered > 0 ? `, ${state.newlyDiscovered} new` : ""}
+          {state.hidden > 0 ? `, ${state.hidden} unpublished (no longer in the wiki)` : ""}.
         </p>
       ) : null}
       {state && !state.ok ? <p className="text-xs text-danger">{state.error}</p> : null}

@@ -192,6 +192,11 @@ model Lesson {
   title              String
   slug               String
   order              Int     @default(0)
+  // Set by sync when this page no longer exists in the BookStack book (deleted or
+  // moved out) — never deleted outright, since a learner may already have Progress
+  // against it. Hidden from every learner-facing list and excluded from completion
+  // counts; reappears automatically if the page comes back in a later sync.
+  hidden             Boolean @default(false)
 
   progress Progress[]
 

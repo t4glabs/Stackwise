@@ -34,7 +34,7 @@ export default async function CourseDetailPage({
     where: { organizationId_slug: { organizationId: org.id, slug } },
     include: {
       program: true,
-      lessons: { orderBy: { order: "asc" } },
+      lessons: { where: { hidden: false }, orderBy: { order: "asc" } },
     },
   });
 

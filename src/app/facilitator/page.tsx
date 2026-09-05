@@ -23,7 +23,7 @@ export default async function FacilitatorPage() {
   // facilitator manages every published course instead of only ones an admin
   // explicitly assigned them to (matches canManageCourseRoster in people-permissions.ts).
   const courseInclude = {
-    lessons: true,
+    lessons: { where: { hidden: false } },
     enrollments: {
       include: {
         learner: true,

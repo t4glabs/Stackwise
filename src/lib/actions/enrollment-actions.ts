@@ -38,6 +38,11 @@ export async function markLessonComplete(lessonId: string, coursePath: string) {
 
   const lesson = await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId } });
 
+  // A lesson can go hidden (its page was deleted in BookStack) after a learner has
+  // already loaded the page but before they submit — the syllabus/lesson pages
+  // already filter these out, this is the server-side half of that gate.
+  if (lesson.hidden) throw new Error("This lesson is no longer available.");
+
   // The lesson page itself only ever renders this action's form for an enrolled
   // learner (redirects otherwise) — this is the server-side half of that gate.
   // Without it, maybeCompleteCourse below would try to update an enrollment row
@@ -81,7 +86,7 @@ export async function markCourseComplete(courseId: string, coursePath: string) {
 
 async function maybeCompleteCourse(learnerId: string, courseId: string) {
   const [lessonCount, completedCount] = await Promise.all([
-    prisma.lesson.count({ where: { courseId } }),
+    prisma.lesson.count({ where: { courseId, hidden: false } }),
     prisma.progress.count({
       where: { learnerId, completedAt: { not: null }, lesson: { courseId } },
     }),

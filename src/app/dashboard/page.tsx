@@ -15,7 +15,7 @@ export default async function DashboardPage() {
   const enrollments = await prisma.enrollment.findMany({
     where: { learnerId: userId },
     include: {
-      course: { include: { lessons: true, program: true } },
+      course: { include: { lessons: { where: { hidden: false } }, program: true } },
     },
     orderBy: { enrolledAt: "desc" },
   });

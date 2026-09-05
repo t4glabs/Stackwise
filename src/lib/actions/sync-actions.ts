@@ -6,7 +6,7 @@ import { getPrimaryOrganization } from "@/lib/org";
 import { syncCourses } from "@/lib/sync";
 
 export type SyncNowState =
-  | { ok: true; booksScanned: number; newlyDiscovered: number }
+  | { ok: true; booksScanned: number; newlyDiscovered: number; hidden: number }
   | { ok: false; error: string }
   | undefined;
 
@@ -34,5 +34,10 @@ export async function syncNowAction(): Promise<SyncNowState> {
   revalidatePath("/admin");
   revalidatePath("/courses");
 
-  return { ok: true, booksScanned: result.booksScanned, newlyDiscovered: result.newlyDiscovered };
+  return {
+    ok: true,
+    booksScanned: result.booksScanned,
+    newlyDiscovered: result.newlyDiscovered,
+    hidden: result.hidden,
+  };
 }
