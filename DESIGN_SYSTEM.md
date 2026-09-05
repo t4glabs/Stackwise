@@ -237,6 +237,28 @@ Fonts loaded in `app/layout.tsx` via `next/font/google`:
   before the import runs, then passed through `importUsersFromWorkbook` so every
   created account becomes a standing `CohortMember` (not just a label), auto-enrolling
   into whatever courses the cohort already follows.
+- **Removing a person is two separate, deliberately different-weight actions**
+  (`User.disabledAt`) — **deactivate** (`DeactivateUserButton`) is the default,
+  reversible one: blocks login (`auth.ts`, `loginAction`) but keeps every
+  Enrollment/Progress/Certificate/cohort-link row untouched, so a facilitator or
+  cohort roster still shows this person's real history. **Permanently delete**
+  (`DeleteUserButton`, `permanentlyDeleteUserAction`) is separate and harder to reach
+  on purpose: only rendered once the account is already deactivated, requires typing
+  the person's exact name before the button enables, is blocked entirely for ADMIN
+  targets (deactivate-only for admins), and cascades through every FK-dependent table
+  in one `$transaction` — **this schema has no cascade deletes configured anywhere**,
+  so any future "delete X" action needs the same explicit-order cleanup, not just
+  `prisma.model.delete()`. Same reasoning applies to `DeleteCohortButton` /
+  `deleteCohortAction`, which must clear `CohortMember`/`CohortCourse`/
+  `CohortFacilitator` before deleting the `Cohort` row.
+- **Type-to-confirm is the pattern for anything irreversible with real blast radius**
+  (permanently deleting a person, deleting a cohort from its own detail page): a
+  collapsed ghost button expands into a red warning card explaining exactly what's
+  about to be lost, with a text input that must exactly match the target's name
+  before the actual action button enables. A plain `window.confirm()` is only for
+  lower-stakes/already-narrow actions (e.g. the quick per-course cohort-delete
+  shortcut in `cohort-manager.tsx`, which just links to the same underlying action
+  the detail page's full flow guards more carefully).
 
 ## When adding a new page
 

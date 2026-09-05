@@ -6,6 +6,7 @@ import { isFeatureEnabled } from "@/lib/flags";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Card } from "@/components/ui/card";
 import { CohortDetailPanel, type CohortMemberRow, type CohortCourseRow } from "@/components/cohort-detail-panel";
+import { DeleteCohortButton } from "@/components/delete-cohort-button";
 import { ArrowLeft } from "lucide-react";
 
 function formatRange(start: Date | null, end: Date | null): string | null {
@@ -100,12 +101,15 @@ export default async function AdminCohortDetailPage({ params }: { params: Promis
         <ArrowLeft className="size-3.5" /> All cohorts
       </Link>
 
-      <div>
-        <Eyebrow className="mb-1.5">Cohort</Eyebrow>
-        <h2 className="text-xl font-semibold tracking-tight text-ink">{cohort.name}</h2>
-        {formatRange(cohort.startDate, cohort.endDate) ? (
-          <p className="mt-1 text-sm text-grey-600">{formatRange(cohort.startDate, cohort.endDate)}</p>
-        ) : null}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <Eyebrow className="mb-1.5">Cohort</Eyebrow>
+          <h2 className="text-xl font-semibold tracking-tight text-ink">{cohort.name}</h2>
+          {formatRange(cohort.startDate, cohort.endDate) ? (
+            <p className="mt-1 text-sm text-grey-600">{formatRange(cohort.startDate, cohort.endDate)}</p>
+          ) : null}
+        </div>
+        <DeleteCohortButton cohortId={cohort.id} name={cohort.name} />
       </div>
 
       <Card className="flex flex-col gap-2">

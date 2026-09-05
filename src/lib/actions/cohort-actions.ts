@@ -77,8 +77,17 @@ export async function deleteCohortAction(
     return { ok: false, error: "Cohort not found." };
   }
 
-  await prisma.enrollment.updateMany({ where: { cohortId }, data: { cohortId: null } });
-  await prisma.cohort.delete({ where: { id: cohortId } });
+  // None of these three join tables cascade-delete from Cohort — each has to be
+  // cleared before prisma.cohort.delete() or it throws a foreign-key violation.
+  // Only the join rows go; every Enrollment/Progress/Certificate they were ever
+  // attached to stays exactly as it is, just un-tagged with this cohort.
+  await prisma.$transaction([
+    prisma.enrollment.updateMany({ where: { cohortId }, data: { cohortId: null } }),
+    prisma.cohortMember.deleteMany({ where: { cohortId } }),
+    prisma.cohortCourse.deleteMany({ where: { cohortId } }),
+    prisma.cohortFacilitator.deleteMany({ where: { cohortId } }),
+    prisma.cohort.delete({ where: { id: cohortId } }),
+  ]);
 
   revalidateCohortSurfaces(coursePath);
   return { ok: true };

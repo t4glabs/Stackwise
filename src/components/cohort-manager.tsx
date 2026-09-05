@@ -152,14 +152,18 @@ function CohortRow({
         <button
           type="button"
           disabled={pending}
-          onClick={() =>
+          onClick={() => {
+            // Admin-only, and this deletes the cohort org-wide (see
+            // deleteCohortAction) — not just unlinking it from this course. A plain
+            // click-to-delete with no confirmation at all would be one misclick away
+            // from erasing a cohort's whole roster link, so gate it the same way any
+            // other irreversible action in this app is gated.
+            if (!window.confirm(`Delete "${cohort.name}" everywhere? This can't be undone.`)) return;
             startTransition(async () => {
-              // Admin-only, and this deletes the cohort org-wide (see
-              // deleteCohortAction) — not just unlinking it from this course.
               const result = await deleteCohortAction(cohort.id, coursePath);
               if (result && !result.ok) setError(result.error);
-            })
-          }
+            });
+          }}
           className="shrink-0 text-grey-500 hover:text-danger disabled:opacity-50"
           aria-label={`Delete ${cohort.name} everywhere`}
           title="Deletes this cohort for every course, not just this one"
