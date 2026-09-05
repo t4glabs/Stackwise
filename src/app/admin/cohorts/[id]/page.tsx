@@ -34,10 +34,32 @@ export default async function AdminCohortDetailPage({ params }: { params: Promis
   });
   if (!cohort) notFound();
 
-  const [allCourses, emailOptional] = await Promise.all([
-    prisma.course.findMany({ where: { organizationId }, orderBy: { title: "asc" }, select: { id: true, title: true } }),
-    isFeatureEnabled(organizationId, "learner_email_optional"),
-  ]);
+  const courseIds = cohort.courses.map((cc) => cc.course.id);
+  const memberLearnerIds = cohort.members.map((m) => m.learnerId);
+
+  const [allCourses, emailOptional, certificatesFlagOn, totalLessons, completionByLearnerId, certifiedLearnerIds] =
+    await Promise.all([
+      prisma.course.findMany({ where: { organizationId }, orderBy: { title: "asc" }, select: { id: true, title: true } }),
+      isFeatureEnabled(organizationId, "learner_email_optional"),
+      isFeatureEnabled(organizationId, "certificates"),
+      prisma.lesson.count({ where: { courseId: { in: courseIds }, hidden: false } }),
+      // Grouped in one query rather than once per member — a cohort's roster can run
+      // into the dozens, and this is rendered on every page load.
+      prisma.progress.groupBy({
+        by: ["learnerId"],
+        where: {
+          completedAt: { not: null },
+          lesson: { courseId: { in: courseIds }, hidden: false },
+        },
+        _count: { _all: true },
+      }),
+      prisma.certificate.groupBy({
+        by: ["learnerId"],
+        where: { learnerId: { in: memberLearnerIds }, courseId: { in: courseIds } },
+      }),
+    ]);
+  const completedByLearnerId = new Map(completionByLearnerId.map((c) => [c.learnerId, c._count._all]));
+  const certifiedLearnerIdSet = new Set(certifiedLearnerIds.map((c) => c.learnerId));
 
   const statsByCourseId = new Map<string, { enrolledCount: number; completedCount: number }>();
   for (const e of cohort.enrollments) {
@@ -51,6 +73,11 @@ export default async function AdminCohortDetailPage({ params }: { params: Promis
     id: m.learner.id,
     name: m.learner.name,
     identifier: m.learner.email ?? m.learner.username,
+    // Against every lesson across every course this cohort follows — not just the
+    // courses this one member happens to be enrolled in (see the type's own comment).
+    percent: totalLessons ? ((completedByLearnerId.get(m.learner.id) ?? 0) / totalLessons) * 100 : 0,
+    hasCertificate: certifiedLearnerIdSet.has(m.learner.id),
+    href: `/admin/people/learners/${m.learner.id}`,
   }));
 
   const courses: CohortCourseRow[] = cohort.courses.map((cc) => ({
@@ -113,6 +140,7 @@ export default async function AdminCohortDetailPage({ params }: { params: Promis
         courses={courses}
         availableCourses={availableCourses}
         emailOptional={emailOptional}
+        certificatesFlagOn={certificatesFlagOn}
       />
     </div>
   );

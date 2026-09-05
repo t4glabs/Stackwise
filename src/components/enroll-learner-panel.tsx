@@ -87,11 +87,18 @@ export function EnrollLearnerPanel({
             <Label htmlFor="enroll-cohort" className="text-xs">
               Cohort (optional)
             </Label>
-            <InfoTooltip label="What is a cohort?">
+            <InfoTooltip label="What does this do?">
               <p>
-                A label for which batch this learner is in (e.g. &quot;March 2026 Batch&quot;) —
-                only used for filtering/reporting later. It doesn&apos;t change what they can
-                access, and you can skip it.
+                Tags <strong>this one enrollment</strong> as belonging to that cohort, for
+                reporting — it&apos;s optional, and skipping it changes nothing about what this
+                learner can access.
+              </p>
+              <p className="mt-2">
+                This is <strong>not</strong> the same as making them a real member of the
+                cohort. It won&apos;t enroll them in the cohort&apos;s other courses, and a
+                facilitator scoped to that cohort still won&apos;t see this person — for either of
+                those, add them as a member from the cohort&apos;s own page instead (Admin →
+                Cohorts), which also auto-enrolls them here.
               </p>
             </InfoTooltip>
           </div>

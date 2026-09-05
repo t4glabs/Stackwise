@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import {
   addCohortMemberAction,
   removeCohortMemberAction,
@@ -17,9 +18,22 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { ProgressBar } from "@/components/progress-bar";
-import { Search, UserPlus, X } from "lucide-react";
+import { Award, Download, Search, UserPlus, X } from "lucide-react";
 
-export type CohortMemberRow = { id: string; name: string; identifier: string };
+// percent — completion across every lesson in every course this cohort follows,
+// not just the courses this one member happens to be enrolled in. Members are
+// auto-enrolled into all of them by the sync engine, so in practice this is a real
+// "how is this person doing" number, not an average across a mismatched set.
+// href — wherever this member's own profile page lives for whoever's viewing this
+// panel (differs between /admin and /facilitator), computed by the server page.
+export type CohortMemberRow = {
+  id: string;
+  name: string;
+  identifier: string;
+  percent: number;
+  hasCertificate: boolean;
+  href: string;
+};
 export type CohortCourseRow = {
   id: string;
   title: string;
@@ -41,31 +55,53 @@ export function CohortDetailPanel({
   courses,
   availableCourses,
   emailOptional,
+  certificatesFlagOn,
 }: {
   cohortId: string;
   members: CohortMemberRow[];
   courses: CohortCourseRow[];
   availableCourses: { id: string; title: string }[];
   emailOptional: boolean;
+  certificatesFlagOn: boolean;
 }) {
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-      <MembersSection cohortId={cohortId} members={members} emailOptional={emailOptional} />
+      <MembersSection
+        cohortId={cohortId}
+        members={members}
+        emailOptional={emailOptional}
+        certificatesFlagOn={certificatesFlagOn}
+      />
       <CoursesSection cohortId={cohortId} courses={courses} availableCourses={availableCourses} />
     </div>
   );
 }
 
+type MemberSort = "name" | "progress";
+
 function MembersSection({
   cohortId,
   members,
   emailOptional,
+  certificatesFlagOn,
 }: {
   cohortId: string;
   members: CohortMemberRow[];
   emailOptional: boolean;
+  certificatesFlagOn: boolean;
 }) {
   const [showAdd, setShowAdd] = useState(false);
+  const [sort, setSort] = useState<MemberSort>("name");
+
+  const sortedMembers = useMemo(() => {
+    if (sort === "name") return members;
+    // Least progress first — the point is surfacing who needs a nudge, not who's
+    // already done. members itself stays name-sorted (from the server) so switching
+    // back to "Name" doesn't require re-fetching anything.
+    return [...members].sort((a, b) => a.percent - b.percent);
+  }, [members, sort]);
+
+  const certifiedCount = members.filter((m) => m.hasCertificate).length;
 
   return (
     <div className="flex flex-col gap-3">
@@ -78,17 +114,44 @@ function MembersSection({
         ) : null}
       </div>
 
+      {certificatesFlagOn && members.length > 0 ? (
+        <p className="text-xs text-grey-600">
+          {certifiedCount} of {members.length} have earned at least one certificate
+        </p>
+      ) : null}
+
       {members.length === 0 ? (
         <p className="text-sm text-grey-600">
           No members yet — add one below. Every course this cohort follows will enroll them
           automatically.
         </p>
       ) : (
-        <ul className="flex flex-col divide-y divide-grey-200 rounded-card border border-grey-200 bg-white">
-          {members.map((member) => (
-            <MemberRow key={member.id} cohortId={cohortId} member={member} />
-          ))}
-        </ul>
+        <>
+          <div className="flex items-center justify-between gap-3">
+            <label className="flex items-center gap-1.5 text-xs text-grey-600">
+              Sort by
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as MemberSort)}
+                className="rounded-control border border-grey-200 bg-white px-2 py-1 text-xs text-ink"
+              >
+                <option value="name">Name</option>
+                <option value="progress">Least progress first</option>
+              </select>
+            </label>
+            <a
+              href={`/api/cohorts/${cohortId}/export`}
+              className="flex items-center gap-1.5 text-xs font-medium text-accent hover:underline"
+            >
+              <Download className="size-3.5" /> Download progress report (.xlsx)
+            </a>
+          </div>
+          <ul className="flex flex-col divide-y divide-grey-200 rounded-card border border-grey-200 bg-white">
+            {sortedMembers.map((member) => (
+              <MemberRow key={member.id} cohortId={cohortId} member={member} />
+            ))}
+          </ul>
+        </>
       )}
 
       {showAdd ? (
@@ -104,9 +167,15 @@ function MemberRow({ cohortId, member }: { cohortId: string; member: CohortMembe
 
   return (
     <li className="flex items-center justify-between gap-3 px-3.5 py-2.5 text-sm">
-      <div className="flex min-w-0 flex-col">
-        <span className="truncate font-medium text-ink">{member.name}</span>
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <Link href={member.href} className="flex items-center gap-1.5 truncate">
+          <span className="truncate font-medium text-accent hover:underline">{member.name}</span>
+          {member.hasCertificate ? (
+            <Award className="size-3.5 shrink-0 text-accent" aria-label="Has earned a certificate" />
+          ) : null}
+        </Link>
         <span className="truncate font-mono text-xs text-grey-500">{member.identifier}</span>
+        <ProgressBar percent={member.percent} className="max-w-32" />
         {error ? <span className="text-xs text-danger">{error}</span> : null}
       </div>
       <button

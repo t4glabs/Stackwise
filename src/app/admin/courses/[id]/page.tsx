@@ -10,6 +10,7 @@ import { EnrollLearnerPanel } from "@/components/enroll-learner-panel";
 import { CertificateCell } from "@/components/certificate-cell";
 import { CohortManager, type CohortSummary } from "@/components/cohort-manager";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
+import { ProgressBar } from "@/components/progress-bar";
 import { ArrowLeft } from "lucide-react";
 
 export default async function AdminCourseEditPage({
@@ -64,7 +65,7 @@ export default async function AdminCourseEditPage({
   }
   const cohortSummaries = Array.from(cohortSummaryById.values()).sort((a, b) => a.name.localeCompare(b.name));
 
-  const [programs, facilitators, allCohorts, flags] = await Promise.all([
+  const [programs, facilitators, allCohorts, flags, totalLessons, completionByLearnerId] = await Promise.all([
     prisma.program.findMany({
       where: { organizationId: session!.user.organizationId },
       orderBy: { name: "asc" },
@@ -81,7 +82,16 @@ export default async function AdminCourseEditPage({
       select: { id: true, name: true },
     }),
     getFlags(session!.user.organizationId),
+    prisma.lesson.count({ where: { courseId: id, hidden: false } }),
+    // One query for the whole roster rather than one per learner — same pattern as
+    // the facilitator course view and the cohort detail pages.
+    prisma.progress.groupBy({
+      by: ["learnerId"],
+      where: { completedAt: { not: null }, lesson: { courseId: id, hidden: false } },
+      _count: { _all: true },
+    }),
   ]);
+  const doneByLearnerId = new Map(completionByLearnerId.map((c) => [c.learnerId, c._count._all]));
 
   const coursePath = `/admin/courses/${course.id}`;
 
@@ -150,6 +160,7 @@ export default async function AdminCourseEditPage({
                 <tr className="border-b border-grey-200 bg-grey-50 text-left text-xs font-semibold uppercase tracking-wide text-grey-600">
                   <th className="px-5 py-2.5">Learner</th>
                   <th className="px-4 py-2.5">Status</th>
+                  <th className="px-4 py-2.5">Progress</th>
                   <th className="px-4 py-2.5">Source</th>
                   {flags.cohorts ? (
                     <th className="px-4 py-2.5">
@@ -157,9 +168,11 @@ export default async function AdminCourseEditPage({
                         Cohort
                         <InfoTooltip label="What is a cohort?">
                           <p>
-                            Which batch this learner was enrolled into (e.g. &quot;March 2026
-                            Batch&quot;) — a label for reporting only. It doesn&apos;t restrict
-                            what they can access.
+                            Which cohort this specific enrollment is tagged with, if any — this is
+                            just a label on this one course, not the same as being a real member of
+                            that cohort (which is what a cohort-scoped facilitator actually checks).
+                            See <span className="font-medium text-ink">Admin → Cohorts</span> to
+                            manage real membership.
                           </p>
                         </InfoTooltip>
                       </span>
@@ -173,10 +186,19 @@ export default async function AdminCourseEditPage({
                   <tr key={enrollment.id} className="border-b border-grey-200 last:border-0">
                     <td className="px-5 py-3 text-ink">
                       <span className="flex items-center gap-2">
-                        {enrollment.learner.name}
-                        {enrollment.learner.role !== "LEARNER" ? (
-                          <Badge pill>{enrollment.learner.role === "ADMIN" ? "Admin" : "Facilitator"}</Badge>
-                        ) : null}
+                        {enrollment.learner.role === "LEARNER" ? (
+                          <Link
+                            href={`/admin/people/learners/${enrollment.learnerId}`}
+                            className="text-accent hover:underline"
+                          >
+                            {enrollment.learner.name}
+                          </Link>
+                        ) : (
+                          <>
+                            {enrollment.learner.name}
+                            <Badge pill>{enrollment.learner.role === "ADMIN" ? "Admin" : "Facilitator"}</Badge>
+                          </>
+                        )}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -185,6 +207,11 @@ export default async function AdminCourseEditPage({
                       ) : (
                         <Badge variant="accent">Active</Badge>
                       )}
+                    </td>
+                    <td className="w-40 px-4 py-3">
+                      <ProgressBar
+                        percent={totalLessons ? ((doneByLearnerId.get(enrollment.learnerId) ?? 0) / totalLessons) * 100 : 0}
+                      />
                     </td>
                     <td className="px-4 py-3 text-grey-600">
                       {enrollment.source === "SELF" ? "Self-enrolled" : "Assigned"}

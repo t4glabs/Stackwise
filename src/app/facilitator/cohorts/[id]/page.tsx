@@ -42,14 +42,36 @@ export default async function FacilitatorCohortDetailPage({ params }: { params: 
   });
   if (!cohort) notFound();
 
-  const [allCourses, emailOptional] = await Promise.all([
-    prisma.course.findMany({
-      where: { organizationId, published: true },
-      orderBy: { title: "asc" },
-      select: { id: true, title: true },
-    }),
-    isFeatureEnabled(organizationId, "learner_email_optional"),
-  ]);
+  const courseIds = cohort.courses.map((cc) => cc.course.id);
+  const memberLearnerIds = cohort.members.map((m) => m.learnerId);
+
+  const [allCourses, emailOptional, certificatesFlagOn, totalLessons, completionByLearnerId, certifiedLearnerIds] =
+    await Promise.all([
+      prisma.course.findMany({
+        where: { organizationId, published: true },
+        orderBy: { title: "asc" },
+        select: { id: true, title: true },
+      }),
+      isFeatureEnabled(organizationId, "learner_email_optional"),
+      isFeatureEnabled(organizationId, "certificates"),
+      prisma.lesson.count({ where: { courseId: { in: courseIds }, hidden: false } }),
+      // Grouped in one query rather than once per member — see the same note on the
+      // admin cohort detail page.
+      prisma.progress.groupBy({
+        by: ["learnerId"],
+        where: {
+          completedAt: { not: null },
+          lesson: { courseId: { in: courseIds }, hidden: false },
+        },
+        _count: { _all: true },
+      }),
+      prisma.certificate.groupBy({
+        by: ["learnerId"],
+        where: { learnerId: { in: memberLearnerIds }, courseId: { in: courseIds } },
+      }),
+    ]);
+  const completedByLearnerId = new Map(completionByLearnerId.map((c) => [c.learnerId, c._count._all]));
+  const certifiedLearnerIdSet = new Set(certifiedLearnerIds.map((c) => c.learnerId));
 
   const statsByCourseId = new Map<string, { enrolledCount: number; completedCount: number }>();
   for (const e of cohort.enrollments) {
@@ -63,6 +85,9 @@ export default async function FacilitatorCohortDetailPage({ params }: { params: 
     id: m.learner.id,
     name: m.learner.name,
     identifier: m.learner.email ?? m.learner.username,
+    percent: totalLessons ? ((completedByLearnerId.get(m.learner.id) ?? 0) / totalLessons) * 100 : 0,
+    hasCertificate: certifiedLearnerIdSet.has(m.learner.id),
+    href: `/facilitator/learners/${m.learner.id}`,
   }));
 
   // Not linkable — /admin/courses isn't reachable by a facilitator, cohort-restricted
@@ -101,6 +126,7 @@ export default async function FacilitatorCohortDetailPage({ params }: { params: 
         courses={courses}
         availableCourses={availableCourses}
         emailOptional={emailOptional}
+        certificatesFlagOn={certificatesFlagOn}
       />
     </Container>
   );

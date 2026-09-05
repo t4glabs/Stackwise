@@ -92,8 +92,12 @@ export default async function FacilitatorPage() {
             <Eyebrow>Your cohorts</Eyebrow>
             <InfoTooltip label="What is this?">
               <p>
-                Cohorts you&apos;ve been scoped to manage — your access to people here comes from
-                these, not the course assignments below.
+                Cohorts an admin has linked you to — you see every member here, across whichever
+                courses each one follows, regardless of what&apos;s assigned below.
+              </p>
+              <p className="mt-2">
+                This is in addition to your course assignments below, not instead of them — if you
+                also have courses assigned directly, both apply at once.
               </p>
             </InfoTooltip>
           </div>
@@ -210,10 +214,11 @@ export default async function FacilitatorPage() {
                                 Cohort
                                 <InfoTooltip label="What is a cohort?">
                                   <p>
-                                    Which batch this learner was enrolled into (e.g. &quot;March
-                                    2026 Batch&quot;) — a label for reporting only. It
-                                    doesn&apos;t restrict what they can access or change what you
-                                    can manage.
+                                    Which cohort this specific enrollment is tagged with, if any —
+                                    a label on this one course, not the same as being a real
+                                    member of that cohort. If you manage a cohort directly, it
+                                    shows up under &quot;Your cohorts&quot; above, with its full
+                                    member list.
                                   </p>
                                 </InfoTooltip>
                               </span>
@@ -293,8 +298,16 @@ function LearnerRow({
     <tr className="border-b border-grey-200 last:border-0">
       <td className="px-6 py-3 text-ink">
         <span className="flex items-center gap-2">
-          {learnerName}
-          {!isActualLearner ? <Badge pill>{learnerRole === "ADMIN" ? "Admin" : "Facilitator"}</Badge> : null}
+          {isActualLearner ? (
+            <Link href={`/facilitator/learners/${learnerId}`} className="text-accent hover:underline">
+              {learnerName}
+            </Link>
+          ) : (
+            <>
+              {learnerName}
+              <Badge pill>{learnerRole === "ADMIN" ? "Admin" : "Facilitator"}</Badge>
+            </>
+          )}
         </span>
       </td>
       <td className="py-3 pr-4">

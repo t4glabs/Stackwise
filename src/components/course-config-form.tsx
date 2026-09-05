@@ -173,6 +173,11 @@ export function CourseConfigForm({
           {facilitatorAssignmentFlagOn && !cohortRestrictedFacilitatorsOnly ? (
             <div className="flex flex-col gap-2">
               <Label>Facilitators</Label>
+              <p className="text-xs text-grey-500">
+                Checking someone here gives them full access to every learner enrolled in this one
+                course — nothing outside it. Also set-able the other way, from a facilitator&apos;s
+                own page under People, if this org uses cohorts instead.
+              </p>
               {allFacilitators.length === 0 ? (
                 <p className="text-sm text-grey-600">
                   No facilitator accounts yet — add one under People first.

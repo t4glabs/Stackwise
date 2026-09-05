@@ -62,20 +62,20 @@ export function CohortManager({
           Cohorts
           <InfoTooltip label="What is a cohort?">
             <p>
-              A cohort is a <strong>label</strong>, not a permission — it groups learners across
-              courses (e.g. &quot;March 2026 Batch&quot;) purely for reporting.
+              A cohort is a standing group of learners — usually a batch, partner group, or
+              location (e.g. &quot;March 2026 Batch&quot;). This panel shows which cohorts
+              currently have someone enrolled here, from an enroll-time tag only — it&apos;s not
+              where members are actually added.
             </p>
             <p className="mt-2">
-              Cohorts are shared org-wide, not tied to one course — every cohort here is already
-              selectable when you enroll a learner into this course, from any course it was first
-              created in. This course only shows up under a cohort once someone&apos;s actually
-              enrolled here with it selected. See{" "}
-              <span className="font-medium text-ink">Admin → Cohorts</span> for the full picture
-              across every course.
+              To add real members (which auto-enrolls them in whatever courses that cohort
+              follows, this one included), or to see the full org-wide picture across every
+              course, go to <span className="font-medium text-ink">Admin → Cohorts</span> instead.
             </p>
             <p className="mt-2">
-              It does <strong>not</strong> restrict what a learner can see or who a facilitator
-              can manage.
+              By itself, a cohort restricts nothing. Optionally, a facilitator can be scoped to
+              one or more cohorts (from that facilitator&apos;s own page) so they only see that
+              cohort&apos;s members — set up separately, not from here.
             </p>
           </InfoTooltip>
         </div>
