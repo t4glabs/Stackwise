@@ -27,14 +27,26 @@ function readCookieLanguage(): string | null {
   return match ? match[1] : null;
 }
 
+// The widget itself (not just our own script) writes a `googtrans` cookie once a
+// translation is live, and it does so scoped to the bare registrable domain (e.g.
+// ".humansofwelive.org"), not just the exact hostname we run on ("lms.humansofwelive.org").
+// Clearing only the exact-hostname cookie left that wider-scoped one behind, so picking
+// "English" again reloaded straight back into the still-cookied language. Setting/
+// clearing all three scopes — host-only, exact hostname, and the registrable root —
+// keeps every variant in sync regardless of which one actually holds the value.
+function cookieDomains(host: string): (string | null)[] {
+  const parts = host.split(".");
+  const root = parts.length > 2 ? parts.slice(-2).join(".") : host;
+  return Array.from(new Set<string | null>([null, host, root]));
+}
+
 function setTranslateCookie(code: string | null) {
   const host = window.location.hostname;
-  if (code) {
-    document.cookie = `googtrans=/en/${code};path=/`;
-    document.cookie = `googtrans=/en/${code};path=/;domain=.${host}`;
-  } else {
-    document.cookie = "googtrans=;path=/;expires=Thu, 01 Jan 1970 00:00:00 UTC";
-    document.cookie = `googtrans=;path=/;domain=.${host};expires=Thu, 01 Jan 1970 00:00:00 UTC`;
+  for (const domain of cookieDomains(host)) {
+    const domainAttr = domain ? `;domain=.${domain}` : "";
+    document.cookie = code
+      ? `googtrans=/en/${code};path=/${domainAttr}`
+      : `googtrans=;path=/${domainAttr};expires=Thu, 01 Jan 1970 00:00:00 UTC`;
   }
 }
 
