@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardTitle } from "@/components/ui/card";
 import { ProgressBar } from "@/components/progress-bar";
 import { ResetPasswordButton } from "@/components/reset-password-button";
+import { DeactivateUserButton } from "@/components/deactivate-user-button";
+import { DeleteUserButton } from "@/components/delete-user-button";
 import { CertificateCell } from "@/components/certificate-cell";
 import { ArrowLeft } from "lucide-react";
 
@@ -64,11 +66,27 @@ export default async function AdminLearnerDetailPage({ params }: { params: Promi
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <Eyebrow className="mb-1.5">Learner</Eyebrow>
-          <h2 className="text-xl font-semibold tracking-tight text-ink">{learner.name}</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold tracking-tight text-ink">{learner.name}</h2>
+            {learner.disabledAt ? <Badge variant="neutral">Deactivated</Badge> : null}
+          </div>
           <p className="mt-1 font-mono text-sm text-grey-600">{learner.email ?? learner.username}</p>
         </div>
-        <ResetPasswordButton userId={learner.id} />
+        <div className="flex items-center gap-1">
+          <ResetPasswordButton userId={learner.id} />
+          <DeactivateUserButton userId={learner.id} disabled={Boolean(learner.disabledAt)} />
+        </div>
       </div>
+
+      {learner.disabledAt ? (
+        <Card className="flex flex-row flex-wrap items-center justify-between gap-3 border-danger/30 bg-danger-soft">
+          <p className="text-sm text-danger">
+            This account is deactivated — {learner.name} can&apos;t log in, but every enrollment,
+            progress record, and certificate below is untouched.
+          </p>
+          <DeleteUserButton userId={learner.id} name={learner.name ?? ""} redirectTo="/admin/people?tab=learners" />
+        </Card>
+      ) : null}
 
       <Card className="flex flex-col gap-2">
         <CardTitle>Cohorts</CardTitle>

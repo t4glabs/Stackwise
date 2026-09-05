@@ -33,13 +33,19 @@ export async function loginAction(_prevState: string | undefined, formData: Form
     where: { OR: [{ email: identifier }, { username: identifier }] },
   });
 
-  // Check the password before saying anything about verification status — surfacing
-  // "this account isn't verified yet" to someone who doesn't actually know the
-  // password would leak whether an email is registered at all.
+  // Check the password before saying anything about verification/disabled status —
+  // surfacing account state to someone who doesn't actually know the password would
+  // leak whether an email is registered at all.
   if (account && !account.emailVerifiedAt) {
     const passwordOk = await verifyPassword(password, account.passwordHash);
     if (passwordOk) {
       return "Please verify your email before logging in — check your inbox for the link we sent when you signed up.";
+    }
+  }
+  if (account && account.disabledAt) {
+    const passwordOk = await verifyPassword(password, account.passwordHash);
+    if (passwordOk) {
+      return "This account has been deactivated. Contact an admin if this isn't right.";
     }
   }
 

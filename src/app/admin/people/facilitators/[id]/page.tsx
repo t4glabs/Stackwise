@@ -4,9 +4,12 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isFeatureEnabled } from "@/lib/flags";
 import { Eyebrow } from "@/components/ui/eyebrow";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardTitle } from "@/components/ui/card";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { FacilitatorCohortChecklist } from "@/components/facilitator-cohort-checklist";
+import { DeactivateUserButton } from "@/components/deactivate-user-button";
+import { DeleteUserButton } from "@/components/delete-user-button";
 import { ArrowLeft } from "lucide-react";
 
 export default async function AdminFacilitatorDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -73,11 +76,31 @@ export default async function AdminFacilitatorDetailPage({ params }: { params: P
         <ArrowLeft className="size-3.5" /> All facilitators
       </Link>
 
-      <div>
-        <Eyebrow className="mb-1.5">Facilitator</Eyebrow>
-        <h2 className="text-xl font-semibold tracking-tight text-ink">{facilitator.name}</h2>
-        <p className="mt-1 font-mono text-sm text-grey-600">{facilitator.email ?? facilitator.username}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <Eyebrow className="mb-1.5">Facilitator</Eyebrow>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold tracking-tight text-ink">{facilitator.name}</h2>
+            {facilitator.disabledAt ? <Badge variant="neutral">Deactivated</Badge> : null}
+          </div>
+          <p className="mt-1 font-mono text-sm text-grey-600">{facilitator.email ?? facilitator.username}</p>
+        </div>
+        <DeactivateUserButton userId={facilitator.id} disabled={Boolean(facilitator.disabledAt)} />
       </div>
+
+      {facilitator.disabledAt ? (
+        <Card className="flex flex-row flex-wrap items-center justify-between gap-3 border-danger/30 bg-danger-soft">
+          <p className="text-sm text-danger">
+            This account is deactivated — {facilitator.name} can&apos;t log in, but their course
+            and cohort assignments below are untouched.
+          </p>
+          <DeleteUserButton
+            userId={facilitator.id}
+            name={facilitator.name ?? ""}
+            redirectTo="/admin/people?tab=facilitators"
+          />
+        </Card>
+      ) : null}
 
       <div
         className={`rounded-card border px-4 py-3 text-sm ${

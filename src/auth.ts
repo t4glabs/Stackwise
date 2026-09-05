@@ -77,6 +77,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
+        // Same defense-in-depth reasoning — a deactivated account (see
+        // deactivateUserAction) keeps every Enrollment/Progress/Certificate row
+        // intact, it just can't sign in anymore until reactivated.
+        if (user.disabledAt) {
+          await logEvent({
+            organizationId: org.id,
+            type: "LOGIN",
+            level: "ERROR",
+            message: `Login blocked for ${user.email ?? user.username}: account deactivated`,
+            userId: user.id,
+            email: user.email,
+          });
+          return null;
+        }
+
         await logEvent({
           organizationId: org.id,
           type: "LOGIN",

@@ -96,6 +96,12 @@ model User {
   createdById String?
 
   createdAt DateTime @default(now())
+  // Null = active. Set = login refused, but every Enrollment/Progress/Certificate
+  // stays intact — the safe, reversible removal path. Permanently deleting the
+  // account (and everything tied to it) is a separate, harder-to-reach action that
+  // requires this to already be set — see deactivateUserAction/
+  // permanentlyDeleteUserAction in user-actions.ts.
+  disabledAt DateTime?
 
   enrollments         Enrollment[]
   progress            Progress[]

@@ -8,6 +8,7 @@ import { Eyebrow } from "@/components/ui/eyebrow";
 import { AddPersonPanel } from "@/components/add-person-panel";
 import { AddAdminForm } from "@/components/add-admin-form";
 import { ResetPasswordButton } from "@/components/reset-password-button";
+import { DeactivateUserButton } from "@/components/deactivate-user-button";
 import { createFacilitatorAction, createLearnerAction } from "@/lib/actions/user-actions";
 import { cn } from "@/lib/utils";
 
@@ -119,8 +120,9 @@ export default async function AdminPeoplePage({
                 <tr className="border-b border-grey-200 bg-grey-50 text-left text-xs font-semibold uppercase tracking-wide text-grey-600">
                   <th className="px-5 py-3">Name</th>
                   <th className="px-4 py-3">Login</th>
+                  <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Added</th>
-                  {activeTab.role !== "ADMIN" ? <th className="px-5 py-3" /> : null}
+                  <th className="px-5 py-3" />
                 </tr>
               </thead>
               <tbody>
@@ -129,6 +131,10 @@ export default async function AdminPeoplePage({
                     <td className="px-5 py-3.5 font-medium text-ink">
                       {activeTab.role === "FACILITATOR" && flags.cohorts ? (
                         <Link href={`/admin/people/facilitators/${user.id}`} className="text-accent hover:underline">
+                          {user.name}
+                        </Link>
+                      ) : activeTab.role === "LEARNER" ? (
+                        <Link href={`/admin/people/learners/${user.id}`} className="text-accent hover:underline">
                           {user.name}
                         </Link>
                       ) : (
@@ -141,12 +147,22 @@ export default async function AdminPeoplePage({
                         {user.email ? <Badge pill>email</Badge> : null}
                       </span>
                     </td>
+                    <td className="px-4 py-3.5">
+                      {user.disabledAt ? (
+                        <Badge variant="neutral">Deactivated</Badge>
+                      ) : (
+                        <Badge variant="success">Active</Badge>
+                      )}
+                    </td>
                     <td className="px-4 py-3.5 text-grey-600">{user.createdAt.toLocaleDateString()}</td>
-                    {activeTab.role !== "ADMIN" ? (
-                      <td className="px-5 py-3.5 text-right">
-                        {user.id !== session!.user.id ? <ResetPasswordButton userId={user.id} /> : null}
-                      </td>
-                    ) : null}
+                    <td className="px-5 py-3.5 text-right">
+                      {user.id !== session!.user.id ? (
+                        <div className="flex items-center justify-end gap-1">
+                          {activeTab.role !== "ADMIN" ? <ResetPasswordButton userId={user.id} /> : null}
+                          <DeactivateUserButton userId={user.id} disabled={Boolean(user.disabledAt)} />
+                        </div>
+                      ) : null}
+                    </td>
                   </tr>
                 ))}
               </tbody>

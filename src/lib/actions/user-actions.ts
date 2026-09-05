@@ -272,3 +272,120 @@ export async function resetPasswordAction(
   revalidatePath("/facilitator");
   return { ok: true, identifier: target.email ?? target.username, password: tempPassword };
 }
+
+export type DeactivateUserState = { ok: true } | { ok: false; error: string } | undefined;
+
+// The safe, reversible removal path — refuses login (see auth.ts) but leaves every
+// Enrollment/Progress/Certificate/cohort link exactly as it was, so a reactivation
+// (or a funder report run before this account existed) sees the same history either
+// way. Admin-only, unlike resetPasswordAction — a facilitator managing their own
+// cohort's youth isn't the right level to be pulling anyone's access entirely.
+export async function deactivateUserAction(
+  targetUserId: string,
+  _prevState: DeactivateUserState
+): Promise<DeactivateUserState> {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "ADMIN") {
+    return { ok: false, error: "Only admins can deactivate an account." };
+  }
+  if (targetUserId === session.user.id) {
+    return { ok: false, error: "You can't deactivate your own account." };
+  }
+
+  const target = await prisma.user.findUnique({ where: { id: targetUserId } });
+  if (!target || target.organizationId !== session.user.organizationId) {
+    return { ok: false, error: "Account not found." };
+  }
+  if (target.disabledAt) return { ok: true };
+
+  // Without this, the last active admin deactivating themselves via another admin
+  // account (or two admins deactivating each other) could lock the whole
+  // organization out of its own admin area with no one left to reverse it.
+  if (target.role === "ADMIN") {
+    const activeAdminCount = await prisma.user.count({
+      where: { organizationId: session.user.organizationId, role: "ADMIN", disabledAt: null },
+    });
+    if (activeAdminCount <= 1) {
+      return { ok: false, error: "Can't deactivate the last active admin — this would lock everyone out." };
+    }
+  }
+
+  await prisma.user.update({ where: { id: targetUserId }, data: { disabledAt: new Date() } });
+
+  revalidatePath("/admin/people");
+  revalidatePath(`/admin/people/facilitators/${targetUserId}`);
+  revalidatePath(`/admin/people/learners/${targetUserId}`);
+  revalidatePath("/facilitator");
+  return { ok: true };
+}
+
+export async function reactivateUserAction(
+  targetUserId: string,
+  _prevState: DeactivateUserState
+): Promise<DeactivateUserState> {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "ADMIN") {
+    return { ok: false, error: "Only admins can reactivate an account." };
+  }
+
+  const target = await prisma.user.findUnique({ where: { id: targetUserId } });
+  if (!target || target.organizationId !== session.user.organizationId) {
+    return { ok: false, error: "Account not found." };
+  }
+
+  await prisma.user.update({ where: { id: targetUserId }, data: { disabledAt: null } });
+
+  revalidatePath("/admin/people");
+  revalidatePath(`/admin/people/facilitators/${targetUserId}`);
+  revalidatePath(`/admin/people/learners/${targetUserId}`);
+  revalidatePath("/facilitator");
+  return { ok: true };
+}
+
+export type DeleteUserState = { ok: true } | { ok: false; error: string } | undefined;
+
+// Deliberately harder to reach than deactivation: only ever runs on an account
+// that's already deactivated, and the UI only ever offers this for learners and
+// facilitators — admin accounts are deactivate-only, on purpose, since accidentally
+// erasing the wrong admin's history has no local upside worth the risk. Nothing here
+// relies on a database cascade (none is configured anywhere in this schema — see
+// DESIGN_SYSTEM.md), so every dependent row is deleted explicitly, in an order that
+// satisfies foreign keys, before the User row itself.
+export async function permanentlyDeleteUserAction(
+  targetUserId: string,
+  _prevState: DeleteUserState
+): Promise<DeleteUserState> {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "ADMIN") {
+    return { ok: false, error: "Only admins can permanently delete an account." };
+  }
+  if (targetUserId === session.user.id) {
+    return { ok: false, error: "You can't delete your own account." };
+  }
+
+  const target = await prisma.user.findUnique({ where: { id: targetUserId } });
+  if (!target || target.organizationId !== session.user.organizationId) {
+    return { ok: false, error: "Account not found." };
+  }
+  if (target.role === "ADMIN") {
+    return { ok: false, error: "Admin accounts can only be deactivated, not permanently deleted." };
+  }
+  if (!target.disabledAt) {
+    return { ok: false, error: "Deactivate this account first, then delete it." };
+  }
+
+  await prisma.$transaction([
+    prisma.enrollment.deleteMany({ where: { learnerId: targetUserId } }),
+    prisma.progress.deleteMany({ where: { learnerId: targetUserId } }),
+    prisma.certificate.deleteMany({ where: { learnerId: targetUserId } }),
+    prisma.cohortMember.deleteMany({ where: { learnerId: targetUserId } }),
+    prisma.courseFacilitator.deleteMany({ where: { facilitatorId: targetUserId } }),
+    prisma.cohortFacilitator.deleteMany({ where: { facilitatorId: targetUserId } }),
+    prisma.verificationToken.deleteMany({ where: { userId: targetUserId } }),
+    prisma.user.delete({ where: { id: targetUserId } }),
+  ]);
+
+  revalidatePath("/admin/people");
+  revalidatePath("/admin/cohorts");
+  return { ok: true };
+}
