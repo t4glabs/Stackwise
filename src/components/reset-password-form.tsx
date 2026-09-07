@@ -28,7 +28,20 @@ export function ResetPasswordForm({ token }: { token: string }) {
         <Label htmlFor="password">New password</Label>
         <Input id="password" name="password" type="password" autoComplete="new-password" required minLength={6} />
       </div>
-      {state && !state.ok ? <p className="text-sm text-danger">{state.error}</p> : null}
+      {state && !state.ok ? (
+        <p className="text-sm text-danger">
+          {state.error}
+          {state.expired ? (
+            <>
+              {" "}
+              <Link href="/forgot-password" className="font-medium underline">
+                Request a new one
+              </Link>
+              .
+            </>
+          ) : null}
+        </p>
+      ) : null}
       <Button variant="accent" type="submit" disabled={pending} className="w-full">
         {pending ? "Saving…" : "Set new password"}
       </Button>

@@ -57,7 +57,10 @@ export async function requestPasswordResetAction(
   return { ok: true, message: GENERIC_MESSAGE };
 }
 
-export type RedeemResetState = { ok: true } | { ok: false; error: string } | undefined;
+export type RedeemResetState =
+  | { ok: true }
+  | { ok: false; error: string; expired?: true }
+  | undefined;
 
 export async function redeemPasswordResetAction(
   token: string,
@@ -76,7 +79,11 @@ export async function redeemPasswordResetAction(
       level: "ERROR",
       message: "Invalid or expired password reset link used",
     });
-    return { ok: false, error: "This reset link is invalid or has expired — request a new one." };
+    // expired: true lets the form render an actual link to /forgot-password instead
+    // of just telling someone to "request a new one" with no way to act on it —
+    // whoever clicks an old invite link (e.g. one sent days ago) shouldn't have to
+    // already know this other page exists.
+    return { ok: false, error: "This reset link is invalid or has expired.", expired: true };
   }
 
   const user = await prisma.user.update({
