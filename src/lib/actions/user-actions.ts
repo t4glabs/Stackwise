@@ -375,6 +375,10 @@ export async function permanentlyDeleteUserAction(
   }
 
   await prisma.$transaction([
+    // Submission has no cascade from Enrollment (see prisma/schema.prisma) — has to
+    // go first, or deleting an enrollment with an attached homework/evidence upload
+    // throws a foreign-key violation.
+    prisma.submission.deleteMany({ where: { enrollment: { learnerId: targetUserId } } }),
     prisma.enrollment.deleteMany({ where: { learnerId: targetUserId } }),
     prisma.progress.deleteMany({ where: { learnerId: targetUserId } }),
     prisma.certificate.deleteMany({ where: { learnerId: targetUserId } }),
