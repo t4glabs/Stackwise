@@ -85,6 +85,25 @@ export const FEATURE_FLAGS = {
     description: "Auto-generated completion certificates.",
     default: false,
   },
+  manual_completion_approval: {
+    label: "Facilitator approval on completion",
+    description:
+      "A course only counts as finished once a facilitator or admin reviews and approves it — " +
+      "learners can attach files as evidence first.",
+    example:
+      "With this off (the default), reaching 100% of a course's lessons completes it " +
+      "immediately — that's the only behavior that's ever existed before this setting.\n\n" +
+      "With this on, hitting 100% instead shows the learner \"Waiting on your facilitator\" — " +
+      "nothing completes and no certificate goes out yet. The learner can attach a file (a " +
+      "local test, homework, anything done offline) as evidence, though it's never required — " +
+      "a facilitator can approve based on an in-person check alone. Whoever can already manage " +
+      "that learner (the course's assigned facilitator, or their cohort's coordinator) sees an " +
+      "Approve button on the learner's page. Approving completes it exactly as it would have " +
+      "automatically — same certificate rule applies, just manually triggered. They can also " +
+      "send it back with a short note instead, which the learner sees on the course page; " +
+      "nothing completes until it's approved.",
+    default: false,
+  },
   public_catalog: {
     label: "Public catalog",
     description: "Course list is visible without logging in.",

@@ -259,6 +259,29 @@ Fonts loaded in `app/layout.tsx` via `next/font/google`:
   lower-stakes/already-narrow actions (e.g. the quick per-course cohort-delete
   shortcut in `cohort-manager.tsx`, which just links to the same underlying action
   the detail page's full flow guards more carefully).
+- **`manual_completion_approval`**: hitting 100% of a course's lessons normally
+  auto-completes it (`maybeCompleteCourse` in `enrollment-actions.ts`) — this flag
+  makes it hold there instead, until a facilitator/admin explicitly
+  `approveCompletionAction`s it (same status flip + `maybeIssueCertificate` call the
+  automatic path already used) or `requestRevisionAction`s it back with a note
+  (`Enrollment.revisionNote`, shown to the learner, nothing completes). A learner can
+  attach evidence at any point via `Submission` rows (learner-owned files scoped to
+  one `Enrollment`, never required for approval — a facilitator can approve on an
+  in-person check alone). Only meaningful for lesson-based courses
+  (SELF_PACED/FACILITATED), same scoping as `downloadableWorkbook` — an
+  EXTERNAL_LINK course's single "mark as complete" click is untouched.
+  `SubmissionPanel` (learner-facing, on the course page) and `CompletionReviewCell`
+  (facilitator/admin-facing, a `CertificateCell`-shaped table cell on both learner
+  detail pages) are the two UI halves; the roster pages (`admin/courses/[id]`,
+  `facilitator/page.tsx`) only get a lightweight "Awaiting review" badge, not the
+  full review controls — one place to actually act, not two to keep in sync.
+- **Submission files are never under `public/`** (`private-uploads/submissions/`,
+  gitignored, path outside the Next.js static-serving tree entirely) — unlike a
+  logo/favicon, a homework upload is about one specific learner and shouldn't be
+  reachable by a guessed URL. The only path to one is
+  `/api/submissions/[id]/download`, gated by `canManageEnrollment` (or being the
+  learner who uploaded it) — same permission function every other per-enrollment
+  action already uses, not a new access rule to keep in sync.
 
 ## When adding a new page
 

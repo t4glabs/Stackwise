@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { ProgressBar } from "@/components/progress-bar";
 import { WorkbookDownloads, type WorkbookChapter } from "@/components/workbook-downloads";
+import { SubmissionPanel } from "@/components/submission-panel";
 import { wrapTablesForScroll } from "@/lib/html";
 import { enrollInCourse, markCourseComplete } from "@/lib/actions/enrollment-actions";
 import { CheckCircle2, Circle, ExternalLink } from "lucide-react";
@@ -69,6 +70,28 @@ export default async function CourseDetailPage({
         })
       : null;
 
+  // Manual approval only applies to lesson-based courses (self-paced/facilitated) —
+  // an external-link course has no lesson checklist for "100%" to mean anything
+  // against, same scoping as downloadableWorkbook above.
+  const showSubmissionPanel = Boolean(
+    flags.manual_completion_approval && enrollment && course.type !== "EXTERNAL_LINK"
+  );
+  const submissions =
+    showSubmissionPanel && enrollment
+      ? await prisma.submission.findMany({
+          where: { enrollmentId: enrollment.id },
+          orderBy: { createdAt: "desc" },
+          select: { id: true, fileName: true, note: true, createdAt: true },
+        })
+      : [];
+  const awaitingReview = Boolean(
+    showSubmissionPanel &&
+      enrollment &&
+      enrollment.status !== "COMPLETED" &&
+      course.lessons.length > 0 &&
+      percent >= 100
+  );
+
   return (
     <Container className="flex max-w-[720px] flex-col gap-10 py-16">
       <div className="flex flex-col gap-4">
@@ -121,6 +144,16 @@ export default async function CourseDetailPage({
             </Link>
           </Button>
         </div>
+      ) : null}
+
+      {showSubmissionPanel && enrollment ? (
+        <SubmissionPanel
+          enrollmentId={enrollment.id}
+          coursePath={coursePath}
+          submissions={submissions.map((s) => ({ ...s, createdAt: s.createdAt.toISOString() }))}
+          awaitingReview={awaitingReview}
+          revisionNote={enrollment.revisionNote}
+        />
       ) : null}
 
       {course.downloadableWorkbook ? (

@@ -50,3 +50,7 @@ next-env.d.ts
 # admin-uploaded logo/favicon — runtime content, not source (see DEPLOY.md if you
 # need to back these up)
 /public/uploads/
+
+# learner-uploaded homework/assessment evidence — deliberately NOT under public/,
+# served only through an authenticated route (see app/api/submissions/[id]/download)
+/private-uploads/

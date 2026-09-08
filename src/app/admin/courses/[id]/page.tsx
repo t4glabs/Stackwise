@@ -204,6 +204,10 @@ export default async function AdminCourseEditPage({
                     <td className="px-4 py-3">
                       {enrollment.status === "COMPLETED" ? (
                         <Badge variant="success">Completed</Badge>
+                      ) : flags.manual_completion_approval &&
+                        totalLessons > 0 &&
+                        (doneByLearnerId.get(enrollment.learnerId) ?? 0) >= totalLessons ? (
+                        <Badge variant="warning">Awaiting review</Badge>
                       ) : (
                         <Badge variant="accent">Active</Badge>
                       )}

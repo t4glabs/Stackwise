@@ -241,6 +241,7 @@ export default async function FacilitatorPage() {
                             status={enrollment.status}
                             totalLessons={totalLessons}
                             done={doneByLearnerId.get(enrollment.learnerId) ?? 0}
+                            manualApprovalFlagOn={flags.manual_completion_approval}
                             certificatesFlagOn={flags.certificates}
                             certificateId={certificateByLearnerId.get(enrollment.learnerId) ?? null}
                             cohortsFlagOn={flags.cohorts}
@@ -268,6 +269,7 @@ function LearnerRow({
   status,
   totalLessons,
   done,
+  manualApprovalFlagOn,
   certificatesFlagOn,
   certificateId,
   cohortsFlagOn,
@@ -280,6 +282,7 @@ function LearnerRow({
   status: string;
   totalLessons: number;
   done: number;
+  manualApprovalFlagOn: boolean;
   certificatesFlagOn: boolean;
   certificateId: string | null;
   cohortsFlagOn: boolean;
@@ -313,6 +316,8 @@ function LearnerRow({
       <td className="py-3 pr-4">
         {status === "COMPLETED" ? (
           <Badge variant="success">Completed</Badge>
+        ) : manualApprovalFlagOn && totalLessons > 0 && done >= totalLessons ? (
+          <Badge variant="warning">Awaiting review</Badge>
         ) : (
           <Badge variant="accent">Active</Badge>
         )}

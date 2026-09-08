@@ -85,6 +85,7 @@ export async function markCourseComplete(courseId: string, coursePath: string) {
 }
 
 async function maybeCompleteCourse(learnerId: string, courseId: string) {
+  const course = await prisma.course.findUniqueOrThrow({ where: { id: courseId } });
   const [lessonCount, completedCount] = await Promise.all([
     prisma.lesson.count({ where: { courseId, hidden: false } }),
     prisma.progress.count({
@@ -92,11 +93,19 @@ async function maybeCompleteCourse(learnerId: string, courseId: string) {
     }),
   ]);
 
-  if (lessonCount > 0 && completedCount >= lessonCount) {
-    await prisma.enrollment.update({
-      where: { learnerId_courseId: { learnerId, courseId } },
-      data: { status: "COMPLETED", completedAt: new Date() },
-    });
-    await maybeIssueCertificate(learnerId, courseId);
-  }
+  if (lessonCount === 0 || completedCount < lessonCount) return;
+
+  // With this on, hitting 100% holds here instead of completing — the course page
+  // shows "waiting on your facilitator" (computed live by isAwaitingReview) until an
+  // explicit approveCompletionAction/requestRevisionAction call in
+  // submission-actions.ts moves it forward. Nothing to do on this side but leave the
+  // enrollment exactly as it is.
+  const manualApproval = await isFeatureEnabled(course.organizationId, "manual_completion_approval");
+  if (manualApproval) return;
+
+  await prisma.enrollment.update({
+    where: { learnerId_courseId: { learnerId, courseId } },
+    data: { status: "COMPLETED", completedAt: new Date() },
+  });
+  await maybeIssueCertificate(learnerId, courseId);
 }

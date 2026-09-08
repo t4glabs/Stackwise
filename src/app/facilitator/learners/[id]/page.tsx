@@ -11,6 +11,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { ProgressBar } from "@/components/progress-bar";
 import { ResetPasswordButton } from "@/components/reset-password-button";
 import { CertificateCell } from "@/components/certificate-cell";
+import { CompletionReviewCell } from "@/components/completion-review-cell";
 import { ArrowLeft } from "lucide-react";
 
 // Not under /admin — reachable by any facilitator who can actually manage this
@@ -39,13 +40,19 @@ export default async function FacilitatorLearnerDetailPage({ params }: { params:
   if (!learner) notFound();
 
   const courseIds = learner.enrollments.map((e) => e.courseId);
+  const enrollmentIds = learner.enrollments.map((e) => e.id);
 
-  const [flags, totalsByCourse, completedProgress] = await Promise.all([
+  const [flags, totalsByCourse, completedProgress, submissions] = await Promise.all([
     getFlags(organizationId),
     prisma.lesson.groupBy({ by: ["courseId"], where: { courseId: { in: courseIds }, hidden: false }, _count: { _all: true } }),
     prisma.progress.findMany({
       where: { learnerId: id, completedAt: { not: null }, lesson: { courseId: { in: courseIds }, hidden: false } },
       select: { lesson: { select: { courseId: true } } },
+    }),
+    prisma.submission.findMany({
+      where: { enrollmentId: { in: enrollmentIds } },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, enrollmentId: true, fileName: true, note: true, createdAt: true },
     }),
   ]);
 
@@ -56,6 +63,12 @@ export default async function FacilitatorLearnerDetailPage({ params }: { params:
     doneByCourseId.set(cid, (doneByCourseId.get(cid) ?? 0) + 1);
   }
   const certificateIdByCourseId = new Map(learner.certificates.map((c) => [c.courseId, c.id]));
+  const submissionsByEnrollmentId = new Map<string, typeof submissions>();
+  for (const s of submissions) {
+    const list = submissionsByEnrollmentId.get(s.enrollmentId) ?? [];
+    list.push(s);
+    submissionsByEnrollmentId.set(s.enrollmentId, list);
+  }
 
   const coursePath = `/facilitator/learners/${learner.id}`;
 
@@ -104,6 +117,7 @@ export default async function FacilitatorLearnerDetailPage({ params }: { params:
                   <th className="px-5 py-2.5">Course</th>
                   <th className="px-4 py-2.5">Status</th>
                   <th className="px-4 py-2.5">Progress</th>
+                  {flags.manual_completion_approval ? <th className="px-4 py-2.5">Completion review</th> : null}
                   {flags.certificates ? <th className="px-4 py-2.5">Certificate</th> : null}
                 </tr>
               </thead>
@@ -127,6 +141,20 @@ export default async function FacilitatorLearnerDetailPage({ params }: { params:
                       <td className="w-40 px-4 py-3">
                         <ProgressBar percent={percent} />
                       </td>
+                      {flags.manual_completion_approval ? (
+                        <td className="px-4 py-3">
+                          <CompletionReviewCell
+                            enrollmentId={enrollment.id}
+                            coursePath={coursePath}
+                            awaitingReview={enrollment.status !== "COMPLETED" && total > 0 && done >= total}
+                            revisionNote={enrollment.revisionNote}
+                            submissions={(submissionsByEnrollmentId.get(enrollment.id) ?? []).map((s) => ({
+                              ...s,
+                              createdAt: s.createdAt.toISOString(),
+                            }))}
+                          />
+                        </td>
+                      ) : null}
                       {flags.certificates ? (
                         <td className="px-4 py-3">
                           <CertificateCell

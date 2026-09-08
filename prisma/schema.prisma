@@ -234,7 +234,40 @@ model Enrollment {
   enrolledAt  DateTime         @default(now())
   completedAt DateTime?
 
+  // Set only when the org's `manual_completion_approval` flag is on — see
+  // maybeCompleteCourse in lib/actions/enrollment-actions.ts. While that flag is on,
+  // reaching 100% of a course's lessons no longer flips status to COMPLETED on its
+  // own; it waits here until a facilitator/admin explicitly approves
+  // (approveCompletionAction) or sends it back (requestRevisionAction). No FK on the
+  // *ById fields — same bare-reference pattern as User.createdById elsewhere in this
+  // schema; nothing needs to join through them, just display who acted.
+  completionApprovedAt   DateTime?
+  completionApprovedById String?
+  revisionNote           String?
+  revisionRequestedAt    DateTime?
+  revisionRequestedById  String?
+
+  submissions Submission[]
+
   @@unique([learnerId, courseId])
+}
+
+// Evidence a learner attaches to their own enrollment — a local assessment, homework,
+// whatever they were asked to do offline — for a facilitator to look at before
+// approving completion (see Enrollment.completionApprovedAt above). Multiple rows per
+// enrollment are expected: a learner can upload again after a revision request
+// without losing what they submitted before.
+model Submission {
+  id           String     @id @default(cuid())
+  enrollmentId String
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id])
+
+  fileName   String
+  storedPath String // relative path under the private (non-public) uploads root
+  mimeType   String?
+  sizeBytes  Int
+  note       String?
+  createdAt  DateTime @default(now())
 }
 
 model Progress {
