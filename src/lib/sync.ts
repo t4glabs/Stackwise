@@ -16,7 +16,9 @@ export type SyncResult = {
 // Pulls every BookStack book and makes sure a Course row exists for each one — newly
 // discovered books are hidden from the catalog by default (published: false) so an
 // admin can review them in /admin/courses before anything goes live. Only *content*
-// fields (title, description, cover, lessons) are refreshed on repeat syncs; LMS
+// fields (title, slug, description, cover, lessons) are refreshed on repeat syncs —
+// a renamed book's course URL moves to match, same as a renamed page's lesson URL
+// already does. LMS
 // configuration (published, type, program, duration, facilitators) is owned by our own
 // DB from the moment a course is first discovered — see the architecture note in
 // src/lib/tags.ts. Page/lesson bodies are never stored here, only fetched live.
@@ -129,6 +131,7 @@ async function syncOneBook(org: Organization, bookId: number): Promise<boolean> 
         lastSyncedAt: new Date(),
       },
       update: {
+        slug: book.slug,
         title: book.name,
         description: book.description || null,
         coverImageUrl: book.cover?.url ?? null,
@@ -140,6 +143,7 @@ async function syncOneBook(org: Organization, bookId: number): Promise<boolean> 
     await prisma.course.update({
       where: { id: existing.id },
       data: {
+        slug: book.slug,
         title: book.name,
         description: book.description || null,
         coverImageUrl: book.cover?.url ?? null,
