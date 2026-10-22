@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isFeatureEnabled } from "@/lib/flags";
-import { canManageCourseRoster } from "@/lib/people-permissions";
+import { canManageCourseRoster, canManageCohort } from "@/lib/people-permissions";
 import { createUser, type CreateUserState } from "@/lib/actions/user-actions";
 
 export type EnrollableLearner = {
@@ -75,6 +75,14 @@ export async function assignLearnerToCourse(
   const allowed = await canManageCourseRoster(session.user.id, session.user.role, courseId);
   if (!allowed) return { ok: false, error: "You don't manage this course." };
 
+  // Managing this course's roster doesn't imply managing an arbitrary cohort — the
+  // cohort picker lists every cohort in the org (not just ones this facilitator is
+  // linked to), so this has to be checked independently, the same way every other
+  // cohort-tagging write in the app does (see cohort-membership-actions.ts).
+  if (cohortId && !(await canManageCohort(session.user.id, session.user.role, cohortId))) {
+    return { ok: false, error: "You don't manage that cohort." };
+  }
+
   const learner = await prisma.user.findFirst({
     where: { id: learnerId, organizationId: session.user.organizationId, role: "LEARNER" },
   });
@@ -107,11 +115,15 @@ export async function createAndEnrollLearner(
   const allowed = await canManageCourseRoster(session.user.id, session.user.role, courseId);
   if (!allowed) return { ok: false, error: "You don't manage this course." };
 
+  const cohortId = String(formData.get("cohortId") ?? "").trim() || null;
+  if (cohortId && !(await canManageCohort(session.user.id, session.user.role, cohortId))) {
+    return { ok: false, error: "You don't manage that cohort." };
+  }
+
   const emailOptional = await isFeatureEnabled(session.user.organizationId, "learner_email_optional");
   const result = await createUser("LEARNER", formData, emailOptional);
   if (!result || !result.ok) return result ?? { ok: false, error: "Something went wrong." };
 
-  const cohortId = String(formData.get("cohortId") ?? "").trim() || null;
   await prisma.enrollment.create({
     data: { learnerId: result.id, courseId, source: "ASSIGNED", status: "ACTIVE", cohortId },
   });

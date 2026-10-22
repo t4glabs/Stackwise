@@ -8,8 +8,15 @@ import { createToken, consumeToken, appUrl } from "@/lib/tokens";
 import { sendEmail } from "@/lib/email";
 import { passwordResetTemplate } from "@/lib/email-templates";
 import { logEvent } from "@/lib/log";
+import { tryConsumeCooldown, recordSuccess } from "@/lib/rate-limit";
 
 const GENERIC_MESSAGE = "If an account exists for that email, we've sent a reset link.";
+// One reset email per address per cooldown window — stops an attacker from
+// email-bombing a victim's inbox (or burning the operator's Mailgun quota) by
+// repeatedly requesting resets for the same address. The response to the caller
+// stays identical either way (see the comment below), so this is invisible to a
+// legitimate user who just waits a moment before retrying.
+const RESET_COOLDOWN_MS = 60 * 1000;
 
 export type RequestResetState = { ok: true; message: string } | { ok: false; error: string } | undefined;
 
@@ -28,6 +35,14 @@ export async function requestPasswordResetAction(
   if (!parsed.success) return { ok: false, error: "Enter a valid email address." };
 
   const org = await getPrimaryOrganization();
+
+  // Checked before the DB lookup so a locked-out caller never even triggers a query
+  // — but the response below is identical either way, so this never leaks the
+  // cooldown state itself.
+  if (!tryConsumeCooldown(`password-reset:${email}`, RESET_COOLDOWN_MS)) {
+    return { ok: true, message: GENERIC_MESSAGE };
+  }
+
   const user = await prisma.user.findUnique({ where: { email } });
 
   if (user && user.organizationId === org.id) {
@@ -90,6 +105,13 @@ export async function redeemPasswordResetAction(
     where: { id: userId },
     data: { passwordHash: await hashPassword(password) },
   });
+
+  // Successfully completing a reset is strong proof this is the real account
+  // holder — clear any login lockout (see auth.ts's authorize()) so they aren't
+  // still blocked from signing in with the password they just set, for whichever
+  // identifier (email or username — login accepts either) triggered it.
+  recordSuccess(`login:${(user.email ?? "").toLowerCase()}`);
+  recordSuccess(`login:${user.username.toLowerCase()}`);
 
   await logEvent({
     organizationId: user.organizationId,

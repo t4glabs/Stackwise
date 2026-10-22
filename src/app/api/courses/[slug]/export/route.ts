@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getPrimaryOrganization } from "@/lib/org";
-import { getFlags } from "@/lib/flags";
 import { getPage, bookstackIsConfigured } from "@/lib/bookstack";
 import { generateWorkbookDocx } from "@/lib/workbook-export";
 import { slugify } from "@/lib/slugify";
@@ -25,12 +24,14 @@ export async function GET(
     return new Response("Not found", { status: 404 });
   }
 
-  const flags = await getFlags(org.id);
-  if (!flags.public_catalog) {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.redirect(new URL(`/login?callbackUrl=/courses/${slug}`, request.url));
-    }
+  // Always required, independent of the public_catalog display flag: that flag only
+  // ever governed whether the course *listing/detail pages* are visible while logged
+  // out — it was never meant to gate a side-effecting server operation like
+  // generating a document (one that also triggers an outbound image fetch for any
+  // <img> embedded in the course content).
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.redirect(new URL(`/login?callbackUrl=/courses/${slug}`, request.url));
   }
 
   if (!bookstackIsConfigured()) {

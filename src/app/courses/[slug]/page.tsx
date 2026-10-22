@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getPrimaryOrganization } from "@/lib/org";
@@ -11,7 +11,7 @@ import { Eyebrow } from "@/components/ui/eyebrow";
 import { ProgressBar } from "@/components/progress-bar";
 import { WorkbookDownloads, type WorkbookChapter } from "@/components/workbook-downloads";
 import { SubmissionPanel } from "@/components/submission-panel";
-import { wrapTablesForScroll } from "@/lib/html";
+import { renderBookstackHtml } from "@/lib/html";
 import { enrollInCourse, markCourseComplete } from "@/lib/actions/enrollment-actions";
 import { CheckCircle2, Circle, ExternalLink } from "lucide-react";
 
@@ -30,6 +30,10 @@ export default async function CourseDetailPage({
   const org = await getPrimaryOrganization();
   const flags = await getFlags(org.id);
   const session = await auth();
+
+  if (!flags.public_catalog && !session) {
+    redirect(`/login?callbackUrl=/courses/${slug}`);
+  }
 
   const course = await prisma.course.findUnique({
     where: { organizationId_slug: { organizationId: org.id, slug } },
@@ -373,7 +377,7 @@ function SyllabusList({
               {block.chapterDescriptionHtml ? (
                 <div
                   className="prose prose-sm max-w-none text-[13px] leading-relaxed text-grey-600 prose-p:my-0"
-                  dangerouslySetInnerHTML={{ __html: wrapTablesForScroll(block.chapterDescriptionHtml) }}
+                  dangerouslySetInnerHTML={{ __html: renderBookstackHtml(block.chapterDescriptionHtml) }}
                 />
               ) : null}
             </div>

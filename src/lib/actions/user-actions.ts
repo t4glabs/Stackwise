@@ -14,6 +14,7 @@ import { credentialsTemplate, adminSetupTemplate } from "@/lib/email-templates";
 import { createToken, appUrl } from "@/lib/tokens";
 import { logEvent } from "@/lib/log";
 import { canManageLearner } from "@/lib/people-permissions";
+import { recordSuccess } from "@/lib/rate-limit";
 import { revalidatePath } from "next/cache";
 import type { Role } from "@/generated/prisma/client";
 
@@ -267,6 +268,12 @@ export async function resetPasswordAction(
     where: { id: targetUserId },
     data: { passwordHash: await hashPassword(tempPassword) },
   });
+
+  // An admin/facilitator-issued reset is as authoritative as a self-service one —
+  // clear any login lockout (see auth.ts's authorize()) so the account holder isn't
+  // still blocked from signing in with the new password they're about to be handed.
+  recordSuccess(`login:${(target.email ?? "").toLowerCase()}`);
+  recordSuccess(`login:${target.username.toLowerCase()}`);
 
   revalidatePath("/admin/people");
   revalidatePath("/facilitator");

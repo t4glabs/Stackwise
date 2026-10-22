@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { isFeatureEnabled } from "@/lib/flags";
 import { canManageEnrollment } from "@/lib/people-permissions";
 import { maybeIssueCertificate } from "@/lib/certificates";
 import { validateSubmissionFile, storeSubmissionFile } from "@/lib/submission-storage";
@@ -139,24 +138,4 @@ export async function requestRevisionAction(
 
   revalidatePath(coursePath);
   return { ok: true };
-}
-
-// Whether manual_completion_approval is on AND this enrollment has finished every
-// lesson but hasn't been approved yet — the one condition both the learner's course
-// page and the facilitator's review UI need to compute the same "pending" state from.
-export async function isAwaitingReview(
-  organizationId: string,
-  enrollment: { status: string; courseId: string; learnerId: string; completionApprovedAt: Date | null }
-): Promise<boolean> {
-  if (enrollment.status === "COMPLETED") return false;
-  const flagOn = await isFeatureEnabled(organizationId, "manual_completion_approval");
-  if (!flagOn) return false;
-
-  const [lessonCount, doneCount] = await Promise.all([
-    prisma.lesson.count({ where: { courseId: enrollment.courseId, hidden: false } }),
-    prisma.progress.count({
-      where: { learnerId: enrollment.learnerId, completedAt: { not: null }, lesson: { courseId: enrollment.courseId, hidden: false } },
-    }),
-  ]);
-  return lessonCount > 0 && doneCount >= lessonCount;
 }

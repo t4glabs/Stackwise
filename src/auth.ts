@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
 import { logEvent } from "@/lib/log";
 import { getPrimaryOrganization } from "@/lib/org";
+import { checkLockout, recordFailedAttempt, recordSuccess } from "@/lib/rate-limit";
 import type { Role } from "@/generated/prisma/client";
 
 // Learner/Facilitator/Admin accounts live entirely in our own DB, separate from
@@ -28,17 +29,38 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // The single gate every credentials login passes through regardless of call
         // path, so it's the right place to record the outcome for /admin/logs —
         // loginAction's own pre-checks give a friendlier in-page message, but this is
-        // what actually happened.
+        // what actually happened. It's also the right place for the lockout check
+        // below, for the same reason: nothing reaches a password comparison without
+        // going through here first, regardless of which code path calls signIn.
         const org = await getPrimaryOrganization();
 
         // Most accounts log in with their email; accounts created without one (see
         // learner_email_optional / facilitator_email_optional flags) use a username
         // instead — one field on the login form covers both.
         const value = identifier.trim().toLowerCase();
+
+        // Some staff-issued credentials (temp passwords, resets) are deliberately
+        // low-entropy — see temp-password.ts — so this is the control that actually
+        // makes them safe rather than a cosmetic inconvenience: without it, the
+        // keyspace is small enough to guess outright. Keyed by identifier rather than
+        // source IP so spreading attempts across IPs doesn't help an attacker.
+        const lockoutKey = `login:${value}`;
+        if (checkLockout(lockoutKey) !== null) {
+          await logEvent({
+            organizationId: org.id,
+            type: "LOGIN",
+            level: "ERROR",
+            message: `Login blocked for "${value}": too many failed attempts, temporarily locked out`,
+            email: value,
+          });
+          return null;
+        }
+
         const user = await prisma.user.findFirst({
           where: { OR: [{ email: value }, { username: value }] },
         });
         if (!user) {
+          recordFailedAttempt(lockoutKey);
           await logEvent({
             organizationId: org.id,
             type: "LOGIN",
@@ -51,6 +73,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const valid = await verifyPassword(password, user.passwordHash);
         if (!valid) {
+          recordFailedAttempt(lockoutKey);
           await logEvent({
             organizationId: org.id,
             type: "LOGIN",
@@ -61,6 +84,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           });
           return null;
         }
+
+        recordSuccess(lockoutKey);
 
         // Defense in depth — loginAction already checks this with a friendlier
         // message before ever calling signIn, but this is the actual gate: nothing

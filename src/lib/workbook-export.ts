@@ -1,4 +1,5 @@
 import HtmlToDocx from "@turbodocx/html-to-docx";
+import { stripUnsafeImages } from "@/lib/url-safety";
 
 export type ExportSection = {
   heading: string;
@@ -16,7 +17,9 @@ function escapeHtml(value: string): string {
 // (whole-course export only — a single chapter's own export never sets this), an h1
 // chapter heading is inserted first, mirroring the 2-level chapter/page structure
 // shown in the on-site Syllabus. Remote <img> URLs (BookStack's own) are fetched
-// automatically by the docx library — nothing to pre-download here.
+// automatically by the docx library server-side — see stripUnsafeImages in
+// generateWorkbookDocx below, which runs first so that fetch can never reach an
+// internal address a BookStack author embedded in content.
 function buildWorkbookHtml(title: string, sections: ExportSection[], introHtml: string | null): string {
   let currentChapter: string | null | undefined = undefined;
   const body = sections
@@ -52,7 +55,7 @@ export async function generateWorkbookDocx(
   introHtml: string | null = null,
   creator: string = "Stackwise"
 ): Promise<Buffer> {
-  const html = buildWorkbookHtml(title, sections, introHtml);
+  const html = await stripUnsafeImages(buildWorkbookHtml(title, sections, introHtml));
   const result = await HtmlToDocx(html, null, {
     title,
     creator,

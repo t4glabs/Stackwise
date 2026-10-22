@@ -7,8 +7,13 @@ import { createToken, appUrl } from "@/lib/tokens";
 import { sendEmail } from "@/lib/email";
 import { verifyEmailTemplate } from "@/lib/email-templates";
 import { logEvent } from "@/lib/log";
+import { tryConsumeCooldown } from "@/lib/rate-limit";
 
 const GENERIC_MESSAGE = "If that email needs verifying, we've sent a new link.";
+// Same reasoning as password-reset-actions.ts's cooldown — stops repeated resend
+// requests from bombing the same inbox, invisible to the caller since the response
+// is identical either way.
+const RESEND_COOLDOWN_MS = 60 * 1000;
 
 export type ResendVerificationState = { ok: true; message: string } | { ok: false; error: string } | undefined;
 
@@ -27,6 +32,11 @@ export async function resendVerificationAction(
   if (!parsed.success) return { ok: false, error: "Enter a valid email address." };
 
   const org = await getPrimaryOrganization();
+
+  if (!tryConsumeCooldown(`resend-verification:${email}`, RESEND_COOLDOWN_MS)) {
+    return { ok: true, message: GENERIC_MESSAGE };
+  }
+
   const user = await prisma.user.findUnique({ where: { email } });
 
   if (user && !user.emailVerifiedAt && user.organizationId === org.id) {

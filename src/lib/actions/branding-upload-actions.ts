@@ -3,6 +3,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { revalidatePath } from "next/cache";
+import DOMPurify from "isomorphic-dompurify";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -25,6 +26,21 @@ const EXT_BY_MIME: Record<string, string> = {
   "image/x-icon": "ico",
   "image/vnd.microsoft.icon": "ico",
 };
+
+// An SVG can embed <script>/event-handler attributes that execute if the file is
+// ever opened directly (rather than rendered inside an <img>, the only context this
+// app itself uses it in — see site-header.tsx) — it's stored at a public, directly
+// fetchable URL under public/uploads, so a malicious upload here would be stored XSS
+// against anyone who navigates to that URL. Sanitizing before it ever reaches disk
+// closes that without having to drop SVG support entirely; same sanitizer used for
+// BookStack content elsewhere (see lib/html.ts).
+function sanitizeIfSvg(bytes: Buffer, mimeType: string): Buffer {
+  if (mimeType !== "image/svg+xml") return bytes;
+  const sanitized = DOMPurify.sanitize(bytes.toString("utf-8"), {
+    USE_PROFILES: { svg: true, svgFilters: true },
+  });
+  return Buffer.from(sanitized, "utf-8");
+}
 
 export type UploadBrandImageState =
   | { ok: true; url: string }
@@ -58,7 +74,8 @@ export async function uploadBrandImage(
   const filename = `${kind}-${session.user.organizationId}-${Date.now()}.${ext}`;
   const uploadsDir = path.join(process.cwd(), "public", "uploads");
   await fs.mkdir(uploadsDir, { recursive: true });
-  await fs.writeFile(path.join(uploadsDir, filename), Buffer.from(await file.arrayBuffer()));
+  const bytes = sanitizeIfSvg(Buffer.from(await file.arrayBuffer()), file.type);
+  await fs.writeFile(path.join(uploadsDir, filename), bytes);
 
   const url = `/uploads/${filename}`;
   await prisma.organization.update({

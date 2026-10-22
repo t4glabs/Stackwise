@@ -71,7 +71,11 @@ MAILGUN_FROM_EMAIL="..."
    architecture plan (`lms_publish=true`, `lms_type=...`, `lms_program=...`, etc.).
 3. Settings > Webhooks > add a webhook pointed at:
    `https://lms.your-org.org/api/webhooks/bookstack?secret=<BOOKSTACK_WEBHOOK_SECRET>`
-   Trigger it on page/chapter/book created/updated/deleted events.
+   Trigger it on page/chapter/book created/updated/deleted events. If your BookStack
+   version's webhook settings let you add a custom header, prefer sending the secret
+   as `X-Webhook-Secret: <BOOKSTACK_WEBHOOK_SECRET>` instead and drop it from the URL
+   — a URL query string can end up in BookStack's own request logs and this app's
+   nginx access logs, where a header won't. The app accepts either.
 
 ## 4. Database + first build
 
@@ -141,8 +145,10 @@ backstop in case a webhook delivery is ever missed:
 
 ```bash
 crontab -e
-# every 20 minutes
-*/20 * * * * curl -fsS "https://lms.your-org.org/api/sync?secret=<BOOKSTACK_WEBHOOK_SECRET>" >/dev/null
+# every 20 minutes — secret sent as a header, not a query string, so it never ends up
+# in nginx access logs (it would still work as ?secret=<...> in the URL if you prefer,
+# but there's no reason to prefer that here since curl makes a header just as easy)
+*/20 * * * * curl -fsS -H "X-Webhook-Secret: <BOOKSTACK_WEBHOOK_SECRET>" "https://lms.your-org.org/api/sync" >/dev/null
 ```
 
 ## 8. Backups

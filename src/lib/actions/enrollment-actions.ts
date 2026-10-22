@@ -96,10 +96,10 @@ async function maybeCompleteCourse(learnerId: string, courseId: string) {
   if (lessonCount === 0 || completedCount < lessonCount) return;
 
   // With this on, hitting 100% holds here instead of completing — the course page
-  // shows "waiting on your facilitator" (computed live by isAwaitingReview) until an
-  // explicit approveCompletionAction/requestRevisionAction call in
-  // submission-actions.ts moves it forward. Nothing to do on this side but leave the
-  // enrollment exactly as it is.
+  // shows "waiting on your facilitator" (computed inline from enrollment/lesson state
+  // where it's displayed — see courses/[slug]/page.tsx) until an explicit
+  // approveCompletionAction/requestRevisionAction call in submission-actions.ts moves
+  // it forward. Nothing to do on this side but leave the enrollment exactly as it is.
   const manualApproval = await isFeatureEnabled(course.organizationId, "manual_completion_approval");
   if (manualApproval) return;
 
